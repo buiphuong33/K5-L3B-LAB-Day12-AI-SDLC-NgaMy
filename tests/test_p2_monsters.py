@@ -4,7 +4,7 @@ import unittest
 
 from chonoi.contract import load_contract
 from chonoi.sim.monsters import MonsterSet
-from helpers import Workdir, events, read_jsonl, run_headless, snapshots, write_json
+from helpers import Workdir, events, individual_hold, item_kinds, read_jsonl, run_headless, snapshots, write_json
 
 GATHER = load_contract()["tuning"]["gather"]
 
@@ -42,10 +42,11 @@ class Monsters(unittest.TestCase):
         self.assertEqual(snapshots(rows)[-1]["monsters"][0]["state"], "patrol")
 
     def test_hit_drops_half_lifo_sets_invuln_and_recoil(self):
-        hold = ["ca_loc", "bong_sung", "ca_linh", "keo_neo", "ca_keo"]
+        hold = individual_hold("ca_loc", "bong_sung", "ca_linh", "keo_neo", "ca_keo")
         rows = play({"player": {"pos": [60, 24]}, "hold": hold, "monsters": [croc()]}, 1)
         data = events(rows, "monster_hit")[0]["data"]
-        self.assertEqual((data["monster_id"], data["hp"], data["lost"]), ("M1", 2, ["ca_keo", "keo_neo"]))
+        self.assertEqual((data["monster_id"], data["hp"], item_kinds(data["lost"])),
+                         ("M1", 2, ["ca_keo", "keo_neo"]))
         self.assertEqual(data["pos"], [60, 24])
         last = snapshots(rows)[-1]
         self.assertEqual(last["player"]["invuln_ticks"], 90)
@@ -64,10 +65,13 @@ class Monsters(unittest.TestCase):
         self.assertAlmostEqual(last["pos"][0], 62, delta=0.01)
 
     def test_lethal_hit_faints_with_remaining_hold(self):
-        rows = play({"player": {"pos": [60, 24], "hp": 1}, "hold": ["ca_loc", "ca_linh", "ca_keo"],
+        rows = play({"player": {"pos": [60, 24], "hp": 1},
+                     "hold": individual_hold("ca_loc", "ca_linh", "ca_keo"),
                      "monsters": [croc()]}, 5)
-        self.assertEqual(events(rows, "monster_hit")[0]["data"]["lost"], ["ca_keo"])
-        self.assertEqual(events(rows, "faint")[0]["data"], {"cause": "monster", "lost": ["ca_linh", "ca_loc"], "hp": 0})
+        self.assertEqual(item_kinds(events(rows, "monster_hit")[0]["data"]["lost"]), ["ca_keo"])
+        faint = events(rows, "faint")[0]["data"]
+        self.assertEqual((faint["cause"], item_kinds(faint["lost"]), faint["hp"]),
+                         ("monster", ["ca_linh", "ca_loc"], 0))
         self.assertEqual(rows[-1]["reason"], "fainted")
 
     def test_default_spawns_follow_from_day_and_id_order(self):

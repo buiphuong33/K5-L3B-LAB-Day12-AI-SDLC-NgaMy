@@ -9,6 +9,30 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+with open(os.path.join(ROOT, "game.contract.json"), encoding="utf-8") as _contract_file:
+    CONTRACT_VERSION = json.load(_contract_file)["contract_version"]
+
+IS_V12 = CONTRACT_VERSION == "1.2"
+
+
+def individual_hold(*kinds, fresh=100):
+    """Fixture giỏ tương ứng schema contract đang được kiểm."""
+    if not IS_V12:
+        return list(kinds)
+    return [{"id": f"I{i}", "kind": kind, "fresh": fresh}
+            for i, kind in enumerate(kinds, 1)]
+
+
+def item_kinds(items):
+    """Đọc thứ tự kind từ giỏ/kho đếm cũ hoặc mảng cá thể v1.2."""
+    if isinstance(items, list):
+        return [item["kind"] if isinstance(item, dict) else item for item in items]
+    return [kind for kind, amount in sorted(items.items()) for _ in range(amount)]
+
+
+def empty_inventory():
+    return {"items": [] if IS_V12 else {}}
+
 
 def write_json(path, obj):
     with open(path, "w", encoding="utf-8") as f:
