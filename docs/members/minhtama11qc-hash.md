@@ -1,12 +1,12 @@
 # minhtama11qc-hash (Phạm Minh Tâm) — phản tư cá nhân
 
-- **Tôi đã làm:** module `sim/gather` và vai PO (giữ `docs/clarify.md`).
-  - Lát 1: oxy, ngạt, Máu, ngất, giỏ LIFO. Commit [`29d6750`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/29d6750), đã gộp qua PR [#1](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/pull/1).
-  - Lát 2: làm ở PR [#2](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/pull/2) nhưng đã đóng. Nhóm dùng bản của Nga ([`dc106c7`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/dc106c7)), vì bản đó bám đúng PRD-0.
-  - Ghi các giả định của gather vào `docs/clarify.md`.
-- **Tôi đã review:** chưa review PR của ai. Theo thỏa thuận nhóm, tôi sẽ đọc chéo phần luật `quan` của Nga.
-- **AI sai ở đâu và tôi phát hiện thế nào:**
-  - Khi chưa có PRD-0, AI tự đoán `data` của các sự kiện (`oxygen_empty`, `faint`, `hold_full`...) và hồi chiêu khi bắt trượt. Đối chiếu với PRD-0 thì thấy sai.
-  - Script kiểm do AI viết gọi sai API `InputPlayer`, và có một ca FAIL chỉ vì cho chạy quá ít tick. Khi in từng tick ra thì thấy code đúng.
-  - AI gắn `@Huyền` trong PR, trong khi đó không phải tên đăng nhập GitHub thật.
-- **Điều tôi học được:** PO phải đọc đặc tả trước khi để AI code. Test xanh chưa chứng minh được luật đúng.
+**Vai:** PO (giữ `docs/clarify.md`), module `sim/gather`, đóng gói P4.
+
+- **Tôi đã làm:**
+  - P1 lát 1 gather: oxy, ngạt, Máu, giỏ LIFO — [`29d6750`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/29d6750), PR [#1](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/pull/1).
+  - P2 khung `FishSchool` — [`4402050`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/4402050).
+  - P3 độ tươi buổi sáng + `test_p3_gather` — [`47c467b`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/47c467b), PR [#4](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/pull/4).
+  - P4 README, LICENSE, CREDITS, `tools/package_release.py` — PR [#5](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/pull/5).
+- **Đã giúp ai:** phân tích tác động gather cho Phương (P3); phát hiện gather cần `contract_version` trong tuning, Nga thêm ở [`3973760`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/3973760). Đọc `items.py`/ADR 0001 và `quan.py` của Nga để khớp bàn giao.
+- **AI sai ở đâu:** AI code trước khi pull `main`, nên lát 2 và cá P2 trùng việc Nga đã làm (PR #2, #3 phải đóng). Ở P3, AI bật kho cá thể theo khối `freshness` thay vì version; merge `main` vào thì 10 test P1/P2 đỏ, phát hiện trước khi gộp.
+- **Bài học:** pull và đọc ADR trước khi làm. Test xanh chưa đủ, phải đối chiếu đặc tả.
