@@ -4,7 +4,8 @@ import json
 import os
 import unittest
 
-from helpers import Workdir, events, read_jsonl, run_headless, snapshots, write_json
+from helpers import (IS_V12, Workdir, empty_inventory, events, individual_hold,
+                     item_kinds, read_jsonl, run_headless, snapshots, write_json)
 
 DISH = "ca_loc_nuong_trui"
 PAYLOAD = {"order_id": "C1", "dish_id": DISH, "base_price": 60}
@@ -53,12 +54,15 @@ class GatherRules(unittest.TestCase):
         self.assertEqual(choke["data"], {"hp": 2})
 
     def test_faint_loses_hold_lifo_and_writes_empty_inventory(self):
-        block = river([20, 5], hold=["ca_loc", "bong_sung"],
+        block = river([20, 5], hold=individual_hold("ca_loc", "bong_sung"),
                       player={"oxygen_ticks": 0, "hp": 1, "zero_oxy_ticks": 59})
         rows, inventory = self.run_ok(block, [], 5, inv_out=True)
-        self.assertEqual(events(rows, "faint")[0]["data"], {"cause": "choke", "lost": ["bong_sung", "ca_loc"], "hp": 0})
-        self.assertEqual(events(rows, "gather_end")[0]["data"], {"reason": "fainted", "inventory": {"items": {}}})
-        self.assertEqual(inventory, {"items": {}})
+        faint = events(rows, "faint")[0]["data"]
+        self.assertEqual((faint["cause"], item_kinds(faint["lost"]), faint["hp"]),
+                         ("choke", ["bong_sung", "ca_loc"], 0))
+        self.assertEqual(events(rows, "gather_end")[0]["data"],
+                         {"reason": "fainted", "inventory": empty_inventory()})
+        self.assertEqual(inventory, empty_inventory())
         self.assertEqual(rows[-1]["reason"], "fainted")
 
     def test_harvest_at_exact_radius_then_regrow(self):
@@ -76,7 +80,8 @@ class GatherRules(unittest.TestCase):
 
     def test_harvest_hold_full_keeps_node(self):
         node = {"id": "N1", "kind": "bong_sung", "pos": [21, 0]}
-        rows, _ = self.run_ok(river([20, 0], nodes=[node], hold=["ca_loc"] * 12), [{"tick": 0, "interact": True}], 1)
+        rows, _ = self.run_ok(river([20, 0], nodes=[node], hold=individual_hold(*(["ca_loc"] * 12))),
+                              [{"tick": 0, "interact": True}], 1)
         self.assertEqual(events(rows, "hold_full")[0]["data"],
                          {"action": "gather", "node_id": "N1", "required": 1, "free": 0})
         self.assertTrue(snapshots(rows)[-1]["nodes"][0]["ready"])
@@ -89,11 +94,12 @@ class GatherRules(unittest.TestCase):
         caught = events(rows, "fish_caught")
         self.assertEqual(caught[0]["data"], {"fish_id": "F1", "kind": "ca_linh", "yield": 3})
         self.assertEqual([e["tick"] for e in caught], [1, 32])  # cạnh ở bước 29 còn hồi chiêu
-        self.assertEqual(snapshots(rows)[-1]["hold"], ["ca_linh"] * 3 + ["ca_loc"])
+        self.assertEqual(item_kinds(snapshots(rows)[-1]["hold"]), ["ca_linh"] * 3 + ["ca_loc"])
 
     def test_catch_hold_full_keeps_fish_without_cooldown(self):
         fish = [{"id": "F1", "kind": "ca_linh", "pos": [21, 5]}, {"id": "F2", "kind": "ca_loc", "pos": [22, 5]}]
-        rows, _ = self.run_ok(river([20, 5], fish=fish, hold=["ca_loc"] * 10), [{"tick": 0, "catch": True}], 1)
+        rows, _ = self.run_ok(river([20, 5], fish=fish, hold=individual_hold(*(["ca_loc"] * 10))),
+                              [{"tick": 0, "catch": True}], 1)
         self.assertEqual(events(rows, "hold_full")[0]["data"],
                          {"action": "catch", "fish_id": "F1", "required": 3, "free": 2})
         last = snapshots(rows)[-1]
@@ -108,7 +114,9 @@ class GatherRules(unittest.TestCase):
         node = {"id": "N1", "kind": "bong_sung", "pos": [21, 0]}
         rows, inventory = self.run_ok(river([20, 0], nodes=[node], time_left_ticks=1),
                                       [{"tick": 0, "interact": True}], 5, inv_out=True)
-        self.assertEqual(inventory, {"items": {"bong_sung": 1}})
+        self.assertEqual(item_kinds(inventory["items"]), ["bong_sung"])
+        if IS_V12:
+            self.assertEqual(inventory["items"][0]["id"], "I1")
         self.assertEqual(rows[-1]["reason"], "time")
 
 
