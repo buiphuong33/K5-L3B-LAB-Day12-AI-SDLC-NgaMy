@@ -56,3 +56,14 @@ python3 -m chonoi.headless --mode gather --seed 42 --scenario dock.json --inputs
 python3 -m chonoi.headless --mode quan --seed 42 --inventory catch.json --ticks 600 --out quan.jsonl
 ```
 Kỳ vọng snapshot quán tick 0: `stock:{"bong_sung":2,"ca_loc":1}`.
+
+## 5. v1.1 — vòng ngày (Phase 2, chủ: Phương)
+
+- `game.contract.json`: `contract_version: "1.1"`, 6 nguyên liệu, 6 món, 2 bếp/4 bàn, 8 đàn đầu ca, N5/N6 kèo nèo, `fish_*`, `gather.monsters` (M1 từ Ngày 1, M2 từ Ngày 3), `day_plan` D1–D5 (ingredients = công thức × số suất, `contract.py` kiểm), `shop` (oxygen 200/400, hp 250/500, `max_ticks` 600). `extensions: []`.
+- Nguyên liệu hợp lệ: `chonoi/inventory.py::KINDS` (6 loại).
+- `--mode day [--days 1..5]` → `chonoi/sim/day.py::DaySim`. Pha `gather → quan → shop`; event có thêm `day`.
+- **Giao ước gather ↔ day:** `day.py` ghi `tuning.gather.current_day` (thiếu = 1) để `gather`/`monsters` chọn quái theo `from_day`; cấp oxygen/hp áp bằng cách ghi đè `oxygen_max_s`/`hp_max` trong bản sao tuning của Ngày. Quán nhận `menu` đã lọc theo món trong kế hoạch.
+- **Inputs:** nút mới `pause`, `shop_done` (cạnh lên); `buy` là chuỗi, chỉ ở frame khai báo (`oxygen`, `hp`, lệnh khác → `buy_failed unknown`).
+- **Pause** (cả 3 mode, ở `runner.Session`): cạnh pause → chỉ tăng `tick`, phát `paused`; `sim_tick`, `phase_tick`, timer đứng yên; cạnh kế → `resumed` và chạy gameplay ngay bước đó.
+- **Snapshot day:** thêm `day, day_plan, upgrades, active_upgrades, days_completed`; Shop có `stock` dư và `time_left_ticks` tới lúc đóng. Snapshot ghi thêm ở tick đổi pha (`phase_tick: 0`). Dòng `end` thêm `days_completed`, `reason: days_complete`.
+- **Scenario day:** khối `day {money, earned, reputation, upgrades, day_plan}`; cấm `quan.stock`, `quan.reputation`; cần `0 ≤ money ≤ earned` (kiểm ở `day.py::load_day_scenario`).
