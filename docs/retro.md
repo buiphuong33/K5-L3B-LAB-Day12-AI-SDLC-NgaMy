@@ -12,6 +12,11 @@
 - Điều rút ra khi tích hợp: `fish.py` và `monsters.py` viết trước khi đọc kỹ ticket nên phải sửa lại lúc ráp vào `gather`.
 - 1 hành động cho Phase 3 (Nga): khi contract v1.1 và `day.py` được gộp, chạy smoke mở quán với kho bàn giao và xác nhận món ngoài kế hoạch không xuất hiện trong lựa chọn khách.
 
+## Phase 3 (nhanh)
+- Điều tốt: dùng `Freshness`, `freshest`, `decay` và `fresh_price` chung để so ngưỡng 30 và floor giá chính xác; đơn giữ cá thể tươi nhất theo ID và có một lần thử giữ lại khi hàng ươn.
+- Điều tệ: adapter và `DaySim` cá thể đã được gộp, nhưng contract vẫn v1.1, gather còn xuất kho đếm và chưa có test quán P3; chưa xác nhận được tích hợp end-to-end.
+- 1 hành động cho Phase 4 (Nga): sau khi gộp adapter v1.2, đối chiếu snapshot/event của `stock`, reservation và `cook_started.items` với smoke hai tiến trình.
+
 ## Phase 4 (cuối)
 - Rà lại hành động Phase 2: đã làm chưa? vì sao?
 - Điều tốt / điều tệ:

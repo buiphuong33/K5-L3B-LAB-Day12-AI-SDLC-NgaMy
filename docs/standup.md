@@ -3,5 +3,6 @@
 | Phase | Người | Đã xong | Sắp làm | Vướng gì |
 |---|---|---|---|---|
 | 1 | Nga | Đọc PRD-0 bản đầy đủ; chỉnh vòng đời đơn, payload món, thứ tự timer/tương tác/đóng ca và kiểm mâu thuẫn scenario | Nhờ QA đối chiếu AC khách/bếp/phục vụ và xác nhận event | Không có |
-| 2 | Nga | Mở rộng `QuanSim` để nhận danh sách món theo kế hoạch; kiểm scenario gather/quan/day theo schema v1.1, gồm nguyên liệu động, quái, day plan và kho bàn giao | Tích hợp với `game.contract.json` v1.1 và `day.py`; chạy lại khi Phương/Huyền đưa phần giao diện và fixture vào repo | Contract hiện trong repo vẫn là v1.0; chưa có `day.py` hoặc `tests/test_p2_quan.py` nên cần smoke tích hợp sau khi các phần phụ thuộc được gộp |
+| 2 | Nga | Lọc thực đơn theo kế hoạch ngày; kiểm scenario gather/quan/day; phần quán được gộp trong tag `phase-2` | Hoàn tất; đối chiếu lại regression trên main | Không còn blocker Phase 2 |
 | 2 | Nga | Ráp cá, Cá Sấu vào `gather`; 73/73 test; smoke `day` 1 và 5 Ngày | Chơi thử trên trình duyệt, gắn tag `phase-2` | HUD chưa được xác nhận trên trình duyệt |
+| 3 | Nga | Thêm kho cá thể trong quán, hao tươi và `spoiled`; giữ chỗ theo ID, thử giữ lại một lần, tính giá theo độ tươi và kiểm fixture v1.2; regression hiện có 92/92 và smoke luật quán đạt | Ráp khi gather chuyển sang cá thể; chạy `tests/test_p3_quan.py` khi Huyền đưa vào | Adapter `items.py`/`DaySim` đã có, nhưng contract vẫn v1.1 và gather còn kho đếm; chưa thể smoke end-to-end |
