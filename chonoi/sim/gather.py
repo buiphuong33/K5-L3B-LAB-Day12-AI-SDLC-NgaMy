@@ -24,10 +24,28 @@ import math
 
 from ..ids import sort_by_id
 from ..inventory import hold_to_items
+from .fish import FishSchool
 from .ramp import ramp_velocity
 
 TICK = 60.0
 AXES = ("x", "d")
+
+# Ánh xạ tuning v1.1 (tuning.gather.fish_*) -> settings của FishSchool. Đổi tên khóa contract chỉ sửa ở đây.
+FISH_TUNING = {
+    "speed": "fish_speed", "x_range": "fish_x", "turn_ticks": "fish_turn_ticks", "max": "fish_max",
+    "spawn_ticks": "fish_spawn_ticks", "spawn_x": "fish_spawn_x", "spawn_depths": "fish_spawn_depths",
+    "spawn_clearance": "fish_spawn_clearance", "weights": "fish_weights",
+}
+
+
+def fish_settings(tuning):
+    """settings cho FishSchool, hoặc None khi contract chưa có phần cá (v1.0 -> cá đứng yên)."""
+    g = tuning["gather"]
+    if not all(k in g for k in FISH_TUNING.values()):
+        return None
+    s = {name: g[key] for name, key in FISH_TUNING.items()}
+    s["tick_hz"] = tuning.get("tick_hz", TICK)
+    return s
 
 
 class GatherSim:
@@ -63,9 +81,17 @@ class GatherSim:
             src_fish = t["fish_initial"]
         else:
             src_fish = []
-        # Đàn cá đứng yên ở phase này. Cá bơi / sinh thêm là việc của phase sau.
-        self.fish = [{"id": f["id"], "kind": f["kind"], "pos": [float(c) for c in f["pos"]],
-                      "heading_deg": f.get("heading_deg", 0)} for f in src_fish]
+        # Đàn cá: contract có đủ khóa fish_* (v1.1) -> FishSchool bơi / sinh cá; thiếu -> đứng yên (P1).
+        self.phase_tick = 0
+        settings = fish_settings(tuning)
+        if settings is not None:
+            self.school = FishSchool(src_fish, settings, streams, ids,
+                                     spawn=scenario.get("random_fish", True))
+            self.fish = self.school.fish  # cùng một list: _catch xóa ở đây là FishSchool thấy
+        else:
+            self.school = None
+            self.fish = [{"id": f["id"], "kind": f["kind"], "pos": [float(c) for c in f["pos"]],
+                          "heading_deg": f.get("heading_deg", 0)} for f in src_fish]
         for coll in (self.nodes, self.fish):
             for e in coll:
                 ids.reserve(e["id"])
@@ -98,6 +124,7 @@ class GatherSim:
     # --- một bước ---------------------------------------------------------------
     def step(self, inp):
         events = []
+        self.phase_tick += 1
         # 1. đồng hồ và hàng có sẵn: giảm bộ đếm, nút mọc lại
         self.time_left_ticks = max(0, self.time_left_ticks - 1)
         self.invuln_ticks = max(0, self.invuln_ticks - 1)
@@ -107,6 +134,9 @@ class GatherSim:
                 n["regrow_ticks"] -= 1
                 if n["regrow_ticks"] == 0:
                     events.append(("node_regrown", {"node_id": n["id"]}))
+        # 1b. cá bơi / đổi hướng / sinh cá (GIẢ ĐỊNH vị trí trong bước: clarify #13, chờ mục 4.5)
+        if self.school is not None:
+            self.school.step(self.phase_tick, events)
         # 2. bơi + chặn mép; so phân vùng đầu/cuối bước -> dive / surface
         was_surface = self._at_surface()
         self._move(inp)
