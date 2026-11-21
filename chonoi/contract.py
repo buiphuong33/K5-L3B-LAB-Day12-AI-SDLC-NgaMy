@@ -28,6 +28,7 @@ def load_contract(path=DEFAULT_PATH) -> dict:
         raise BadInput(f"không đọc được {path}: {e}")
     validate_tuning(c.get("tuning"))
     _validate_freshness(c)
+    c["tuning"]["contract_version"] = c["contract_version"]  # sim chọn schema kho theo phiên bản (ADR 0001)
     return c
 
 

@@ -21,13 +21,18 @@ from .ids import sort_by_id
 
 PREFIX = "I"
 TICK_HZ = 60
+FRESH_GRID = 240  # đơn vị mỗi điểm tươi: gather trừ 2, quán trừ 1 mỗi tick
 
 # Mặc định theo ticket; luôn ưu tiên đọc từ tuning["freshness"] qua `Freshness(tuning)`.
 DEFAULT_FRESHNESS = {"initial": 100, "gather_decay_per_s": 0.5, "quan_decay_per_s": 0.25, "spoiled_below": 30}
 
 
 def _frac(v):
-    return Fraction(v) if isinstance(v, int) else Fraction(str(v)) if isinstance(v, float) else Fraction(v)
+    if isinstance(v, float):
+        # giá trị đọc lại từ file: khớp đúng lưới 1/240 thì khôi phục số chính xác, tránh lệch ở ngưỡng 30
+        on_grid = Fraction(round(v * FRESH_GRID), FRESH_GRID)
+        return on_grid if float(on_grid) == v else Fraction(str(v))
+    return Fraction(v)
 
 
 class Freshness:

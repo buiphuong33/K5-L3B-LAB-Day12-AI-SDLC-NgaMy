@@ -42,8 +42,7 @@ def is_v12(tuning) -> bool:
 def _item_in(e):
     """Cá thể từ scenario / mẫu day (fresh là số JSON) hoặc đã ở dạng nội bộ (Fraction) -> dạng nội bộ."""
     f = e["fresh"]
-    fresh = f if isinstance(f, Fraction) else Fraction(str(f)) if isinstance(f, float) else Fraction(f)
-    return {"id": e["id"], "kind": e["kind"], "fresh": fresh}
+    return {"id": e["id"], "kind": e["kind"], "fresh": f if isinstance(f, Fraction) else it._frac(f)}
 
 
 def _jsonable(e):
