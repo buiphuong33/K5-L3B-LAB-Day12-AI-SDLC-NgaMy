@@ -34,6 +34,10 @@ class MonsterSet:
         for m in self.monsters:
             if m["state"] == "recoil":
                 self._recoil_step(m)
+            elif m["state"] == "stunned":
+                m["state_ticks_left"] = max(0, m["state_ticks_left"] - 1)
+                if m["state_ticks_left"] == 0:
+                    m["state"] = "patrol"
             else:
                 self._update(m, player.pos)
                 can_hit.append(m)

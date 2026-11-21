@@ -1,9 +1,9 @@
 # Kiểm chứng lát cá sấu Phase 2
 
 - Ngày: 2026-11-21 (Asia/Bangkok)
-- Commit code được kiểm: `da4ed57`
+- Commit code được kiểm: `ee2ee05`
 - Môi trường: Windows, Python 3.10.1
-- Contract tại thời điểm kiểm: v1.0; test dùng tuning fixture truyền vào module
+- Contract tại thời điểm kiểm: v1.1; test đọc trực tiếp `tuning.gather.monsters`
 
 ## Lệnh và kết quả
 
@@ -12,16 +12,21 @@ PYTHONPATH=tests:. python3 -m unittest tests.test_p2_monsters -v
 PYTHONPATH=tests:. python3 -m unittest discover -s tests -v
 ```
 
-- Test tập trung cá sấu: **6 chạy, 0 trượt, 0 lỗi**.
-- Toàn bộ regression: **57 chạy, 0 trượt, 0 lỗi**.
+- Test tập trung cá sấu: **8 chạy, 0 trượt, 0 lỗi**.
+- Toàn bộ regression: **66 chạy, 0 trượt, 0 lỗi**.
 
 ## Phạm vi đã kiểm
 
-- Snapshot sắp id số (`M2` trước `M10`), patrol phản xạ ở mép và chase hướng tới người chơi.
-- Mỗi tick tối đa một hit, ưu tiên id nhỏ; rơi đồ LIFO; gán đúng `invuln_ticks` từ tuning.
-- Recoil sau va chạm; hit chí mạng phát `faint` do quái, xóa giỏ và kết thúc gather khi player cung cấp `_finish`.
-- Thiếu tuning bắt buộc bị từ chối, không có số gameplay hard-code trong luật.
+- M1 có từ Ngày 1, M2 có từ Ngày 3; snapshot sắp id số (`M2` trước `M10`).
+- Patrol theo hai waypoint, chase dùng hysteresis `detect_radius`/`exit_radius`.
+- Mỗi tick tối đa một hit, ưu tiên id nhỏ; rơi `floor(loss_ratio × số đồ)` theo LIFO (TICKET-02; bản `ee2ee05` dùng ceil, đã sửa khi gộp); bất tử đọc từ contract.
+- Recoil chạy đủ `recoil_ticks` và tổng `recoil_dist`; hit chí mạng phát `faint` do quái, xóa giỏ và kết thúc gather khi player cung cấp `_finish`.
+- Scenario quái thiếu waypoint bị headless từ chối với mã 2.
 
 ## Bàn giao tích hợp
 
-Khởi tạo `MonsterSet(monsters, settings, bounds)`. `settings` cần các khóa `tick_hz`, `patrol_speed`, `chase_speed`, `chase_radius`, `hit_radius`, `recoil_distance`, `hit_damage`, `drop_count`, `invuln_ticks`; mỗi quái cần `id`, `pos`, `patrol_x` và có thể có `kind`, `heading_deg`, `state`. Tâm gọi `step(player, events)` và ghép `snapshot()` vào snapshot gather. Headless v1.1 và scenario `monsters[]` vẫn chờ contract/integration của Phương, Tâm và Nga.
+Khởi tạo `MonsterSet(gather_tuning["monsters"], gather_tuning["bounds"], tuning["tick_hz"], current_day, scenario.get("monsters"))`. Tâm gọi `step(player, events)` và ghép `snapshot()` vào snapshot gather. Contract/scenario v1.1 đã sẵn sàng; headless có quái vẫn chờ Tâm ráp module vào `gather.py` cùng lát cá.
+
+## Cập nhật khi gộp
+
+Module đã được ráp vào `gather.py` với API `MonsterSet(config, bounds, monsters=None, day=1)`. Kết quả toàn suite sau khi gộp: **78 chạy, 0 trượt, 0 lỗi**.

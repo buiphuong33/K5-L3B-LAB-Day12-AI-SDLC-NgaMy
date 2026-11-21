@@ -2,7 +2,11 @@
 
 import unittest
 
+from chonoi.contract import load_contract
+from chonoi.sim.monsters import MonsterSet
 from helpers import Workdir, events, read_jsonl, run_headless, snapshots, write_json
+
+GATHER = load_contract()["tuning"]["gather"]
 
 
 def croc(ident="M1", pos=(60, 24), **extra):
@@ -65,6 +69,38 @@ class Monsters(unittest.TestCase):
         self.assertEqual(events(rows, "monster_hit")[0]["data"]["lost"], ["ca_keo"])
         self.assertEqual(events(rows, "faint")[0]["data"], {"cause": "monster", "lost": ["ca_linh", "ca_loc"], "hp": 0})
         self.assertEqual(rows[-1]["reason"], "fainted")
+
+    def test_default_spawns_follow_from_day_and_id_order(self):
+        make = lambda **k: MonsterSet(GATHER["monsters"], GATHER["bounds"], **k)
+        self.assertEqual([m["id"] for m in make(day=1).snapshot()], ["M1"])
+        self.assertEqual([m["id"] for m in make(day=3).snapshot()], ["M1", "M2"])
+        custom = make(monsters=[croc("M10", (80, 20)), croc("M2", (70, 20))])
+        self.assertEqual([m["id"] for m in custom.snapshot()], ["M2", "M10"])
+
+    def test_chase_exits_beyond_exit_radius(self):
+        m = croc(state="chase")
+        rows = play({"player": {"pos": [40, 24]}, "monsters": [m]}, 1)
+        self.assertEqual(snapshots(rows)[-1]["monsters"][0]["state"], "patrol")
+
+    def test_invulnerability_blocks_hit(self):
+        rows = play({"player": {"pos": [60, 24], "invuln_ticks": 5}, "monsters": [croc()]}, 1)
+        self.assertEqual(events(rows, "monster_hit"), [])
+        self.assertEqual(snapshots(rows)[-1]["player"]["hp"], 3)
+
+    def test_stunned_stays_still_and_cannot_hit(self):
+        m = croc(state="stunned", state_ticks_left=2)
+        rows = play({"player": {"pos": [60, 24]}, "monsters": [m]}, 1)
+        self.assertEqual(events(rows, "monster_hit"), [])
+        self.assertEqual(snapshots(rows)[-1]["monsters"][0]["pos"], [60, 24])
+
+    def test_bad_monster_scenario_exits_2(self):
+        with Workdir() as w:
+            scenario = write_json(w.path("bad.json"), {"gather": {"monsters": [
+                {"id": "M1", "kind": "ca_sau", "pos": [60, 24]},
+            ]}})
+            code, _ = run_headless("--mode", "gather", "--seed", "1", "--ticks", "0",
+                                   "--scenario", scenario, "--out", w.path("out.jsonl"))
+            self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":
