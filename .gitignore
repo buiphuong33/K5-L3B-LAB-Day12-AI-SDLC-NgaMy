@@ -3,3 +3,6 @@ __pycache__/
 *.jsonl
 !tests/fixtures/*.jsonl
 .DS_Store
+
+# bản đóng gói (tools/package_release.py)
+dist/
