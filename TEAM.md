@@ -98,9 +98,40 @@ Tài liệu giữ nguyên chủ cũ: Tâm ghi `docs/clarify.md`, Nga ghi `docs/s
 - **`monsters.py` (Huyền):** tiếp tục `pop` từ `player.hold`, nên `lost` tự là mảng cá thể theo LIFO.
 - **`scenario.py` (Nga):** Phương gửi hàm kiểm cá thể từ `items.py`, Nga dùng cho `gather.hold`, `quan.stock`, `customers[].reserved`.
 
-## Phase 4
+## Phân công Phase 4 (TICKET-04, Test Contract v1.3, hạn tag và Release 3:00)
 
-Yêu cầu mở theo mốc giờ trên lab board. Khi phase mở, Tâm đọc yêu cầu, Phương chia việc trong 5 phút theo nguyên tắc: tính năng thuộc module nào thì chủ module đó làm, tính năng mới đặt ở **file mới có đúng một chủ** và ghi thêm vào bảng trên.
+Phạm vi: chỉ làm **lõi**. Nhóm 4 người không bắt buộc làm bảng xếp hạng và phụ đề SFX. Mỗi file vẫn chỉ có một người sửa.
+
+**Điều kiện trước khi vào Phase 4:** gộp `p3-gather-fresh`, bật `contract_version: "1.2"`, toàn bộ test xanh, gắn tag `phase-3`.
+
+| Người | Vai | Việc phải giao | File sở hữu trong Phase 4 | Test của lát |
+|---|---|---|---|---|
+| **Phương** | Release/Integrator, cảnh báo | Contract v1.3, khai `bench_cmd`, `soak_cmd`; kế hoạch D1–D5 lặp ở Ngày 6–10; ba cảnh báo bằng chữ hoặc biểu tượng, chế độ tương phản cao; `CHANGELOG.md`, release notes; tag `phase-4`, Release `v1.0.0` | `game.contract.json`, `chonoi/contract.py`, `chonoi/headless.py`, `chonoi/sim/day.py`, `chonoi/web/`, `CHANGELOG.md`, `docs/release-notes-v1.0.0.md` (mới) | `tests/test_p4_contract.py` |
+| **Tâm** | Đóng gói | Thử clone sạch, chạy bằng tối đa 3 lệnh; script tạo bản đóng gói; README đủ môi trường, điều khiển, lệnh test, headless, bench; rà `LICENSE`, `CREDITS.md` | `tools/package_release.py` (mới), `README.md`, `LICENSE` (mới), `CREDITS.md`, `docs/clarify.md` | `tests/test_p4_package.py` |
+| **Nga** | Soak, điều phối retro | `soak_cmd` chạy 10 Ngày bằng bot tất định, xuất `soak.json`; rà hành động P2; tổng hợp đóng góp từng người | `chonoi/soak.py` (mới), `docs/retro.md`, `docs/standup.md`, `docs/ai-usage-log.md` | `tests/test_p4_soak.py` |
+| **Huyền** | Bench/QA | `bench_cmd` có render 1280×720, làm nóng 3 s, đo 30 s, xuất đúng 5 trường; regression P1–P3; ma trận AC-P4 và artifact | `chonoi/bench.py` (mới), `tests/` còn lại, `docs/verification/phase-4.md`, `docs/proof/phase-4/` | `tests/test_p4_bench.py` |
+
+Việc của **mọi người** trước 2:55: viết hoặc cập nhật `docs/members/<handle>.md` (≤ 200 từ), nêu phần mình làm, đã giúp ai, AI sai ở đâu, bài học, có dẫn commit. Phương hiện chưa có file này.
+
+### Thứ tự và phụ thuộc
+
+| Mốc | Việc | Người |
+|---|---|---|
+| 2:30–2:33 | `git pull`, chốt tham số `bench_cmd`, `soak_cmd` và cách bench mở phần render | Cả nhóm |
+| Trước 2:35 | Đẩy contract v1.3 và cho `day` chạy quá 5 Ngày | Phương |
+| 2:33–2:45 | Làm song song bench, soak, cảnh báo, đóng gói | Cả nhóm |
+| 2:45 | Standup, điều người sang lát trễ. **Khóa tính năng** sau mốc này | Nga ghi |
+| 2:45–2:52 | Thử clone sạch, regression, lưu `bench.json`, `soak.json`, retro và phản tư | Tâm, Huyền, Nga |
+| 2:52–2:55 | Chốt commit bàn giao trên `main`, tạo bản đóng gói từ đúng commit đó | Phương, Tâm |
+| Trước 3:00 | Đẩy tag `phase-4`, công bố Release `v1.0.0` cùng commit, đính kèm bản đóng gói | Phương |
+
+### Giao diện chốt giữa các lát
+
+- **`bench_cmd`:** `--seed <int> --duration <giây> --out <bench.json>`, xuất `avg_fps`, `p1_low_fps`, `frames`, `measured_s`, `load_ms`.
+- **`soak_cmd`:** `--seed <int> --days <N> --out <soak.json>`, xuất `days`, `days_completed`, `crashes`, `results`, `duration_s`. Mỗi `results[]` có `day`, `earned`, `reputation`, `score` lúc Shop đóng.
+- **`chonoi/soak.py` → `DaySim` (Nga → Phương):** soak gọi trực tiếp `DaySim`, không đi qua giới hạn `--days` 1–5 của headless.
+- **`chonoi/bench.py` → `chonoi/web/` (Huyền → Phương):** bench dùng đúng cảnh `gather` mặc định, Út Sen đứng yên ở bến. Cần thêm móc đo trong trang thì báo Phương.
+- **Sau 2:45:** chỉ sửa lỗi. Mọi thay đổi trên `main` phải chạy lại regression.
 
 ## Thỏa thuận làm việc nhóm (điền trong 15 phút kickoff, ≤ 10 dòng)
 
