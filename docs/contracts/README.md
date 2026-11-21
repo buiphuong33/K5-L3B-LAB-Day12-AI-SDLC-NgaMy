@@ -6,3 +6,9 @@
 3. **Danh sách sự kiện** — tên, `data`, ai phát, ai nghe (gather: `gather`, `node_regrown`, `hold_full`, `fish_caught`, `gather_end`...; quan: theo mục E của PRD-0).
 
 Khi đổi hợp đồng sau này: báo cả nhóm và ghi lại lý do (ADR hoặc ghi chú, tùy chọn).
+
+## Đã chốt (Phase 1)
+
+**File kho** (PRD-0 mục G, ví dụ: `inventory.sample.json`): `{"items": {"<kind>": <số nguyên không âm>}}`. `kind` thuộc `ca_loc`, `ca_linh`, `bong_dien_dien`, `bong_sung`; bên ghi bỏ khóa có lượng 0; kho rỗng là `{"items": {}}`. `gather` ghi đúng một lần khi có `gather_end`, ghi nguyên tử; `quan` từ chối file sai schema bằng mã 2.
+
+**Sim và UI:** UI chỉ đọc snapshot JSON theo mục E và gửi vào `move`, `interact`, `catch`. Sự kiện theo bảng ở mục E.

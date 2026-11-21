@@ -23,6 +23,17 @@ python3 -m chonoi.live --mode gather                                # chơi th�
 
 Game cần chế độ **headless** theo Test Contract (`python3 -m chonoi.headless --mode gather|quan …`) để được chạy và chấm tự động. **Công nghệ không ràng buộc**: khung Python trong `chonoi/` chỉ là gợi ý, chi tiết ở [`docs/STARTER.md`](docs/STARTER.md).
 
+## Cách chơi và tính điểm
+
+- **Điều khiển:** WASD hoặc mũi tên để bơi/đi, **E** để hái, cập bến, nấu, bưng, phục vụ, **Space** để bắt cá khi lặn, **R** để chơi lại.
+- **Nối hai buổi:** `python3 -m chonoi.live --mode gather --inventory-out kho.json`, cập bến, rồi `python3 -m chonoi.live --mode quan --inventory kho.json`.
+- **Điểm:** `earned + 100 × floor(uy tín)`, với `earned` là tổng tiền thu trong lượt (nghìn đồng).
+- **Test (1 lệnh):** `PYTHONPATH=tests:. python3 -m unittest discover -s tests -v`.
+
+## Sáng tạo của nhóm
+
+Phase 1 chưa thêm phần sáng tạo, nhóm ưu tiên làm đúng lõi.
+
 ## Tự do sáng tạo
 
 Ngoài phần đề yêu cầu, nhóm được **thêm** nhân vật, loài cá/cây, sinh vật, món, bản đồ, cơ chế, câu chuyện, đồ họa, âm nhạc… với ba điều kiện: **không phá phần cố định** (tắt ở headless), ghi mục **"Sáng tạo của nhóm"** trong README của nhóm, và **làm lõi đúng trước**.
