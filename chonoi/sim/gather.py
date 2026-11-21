@@ -21,7 +21,9 @@ Các tính năng của phase sau chưa nằm trong khung này.
 """
 
 import math
+from fractions import Fraction
 
+from .. import items as it
 from ..ids import sort_by_id
 from ..inventory import hold_to_items
 from .fish import FishSchool
@@ -30,6 +32,23 @@ from .ramp import ramp_velocity
 
 TICK = 60.0
 AXES = ("x", "d")
+
+
+def is_v12(tuning) -> bool:
+    """Kho cá thể bật theo `contract_version` (ADR 0001 mục 5), KHÔNG theo việc có khối `freshness`."""
+    return str(tuning.get("contract_version", "1.1")) >= "1.2"
+
+
+def _item_in(e):
+    """Cá thể từ scenario / mẫu day (fresh là số JSON) hoặc đã ở dạng nội bộ (Fraction) -> dạng nội bộ."""
+    f = e["fresh"]
+    fresh = f if isinstance(f, Fraction) else Fraction(str(f)) if isinstance(f, float) else Fraction(f)
+    return {"id": e["id"], "kind": e["kind"], "fresh": fresh}
+
+
+def _jsonable(e):
+    """Cá thể nội bộ -> JSON {id, kind, fresh}; phần tử đã là JSON / tên loài (v1.1) giữ nguyên."""
+    return it.to_json(e) if isinstance(e, dict) and isinstance(e.get("fresh"), Fraction) else e
 
 
 class GatherSim:
@@ -53,7 +72,16 @@ class GatherSim:
         self.zero_oxy_ticks = p.get("zero_oxy_ticks", 0)
         self.invuln_ticks = p.get("invuln_ticks", 0)
         self.catch_cd_ticks = p.get("catch_cd_ticks", 0)
-        self.hold = list(scenario.get("hold", []))  # thứ tự nhặt, cuối mảng là mới nhất
+        # Độ tươi (TICKET-03, ADR 0001): contract >= 1.2 -> giỏ chứa cá thể NỘI BỘ của `chonoi.items`
+        # {id, kind, fresh: Fraction}; contract 1.1 -> giỏ là mảng tên loài như cũ.
+        self._fr = it.Freshness(tuning) if is_v12(tuning) else None
+        self.hold = []  # thứ tự vào giỏ, cuối mảng là mới nhất (LIFO khi mất hàng)
+        for e in scenario.get("hold", []):
+            if self._fr is None:
+                self.hold.append(e)
+            else:
+                ids.reserve(e["id"])
+                self.hold.append(_item_in(e))
         self.time_left_ticks = scenario.get("time_left_ticks", int(round(t["duration_s"] * TICK)))
         # nút và đàn cá: scenario THAY THẾ danh sách mặc định; random_fish=false tắt cá mặc định
         src_nodes = scenario["nodes"] if "nodes" in scenario else t["nodes"]
@@ -75,8 +103,11 @@ class GatherSim:
         self.reason = None
 
     # --- giao diện cho runner -------------------------------------------------
-    def inventory_items(self) -> dict:
-        return hold_to_items(self.hold)
+    def inventory_items(self):
+        """v1.2: list cá thể NỘI BỘ sắp theo id (write_inventory / day tự xuất JSON). v1.1: object đếm."""
+        if self._fr is None:
+            return hold_to_items(self.hold)
+        return it.clone(it.sorted_by_id(self.hold))
 
     def snapshot(self) -> dict:
         return {
@@ -85,7 +116,7 @@ class GatherSim:
                        "hp": self.hp, "hp_max": self.t["hp_max"], "zero_oxy_ticks": self.zero_oxy_ticks,
                        "invuln_ticks": self.invuln_ticks, "catch_cd_ticks": self.catch_cd_ticks,
                        "at_surface": self._at_surface()},
-            "hold": self.hold, "hold_count": len(self.hold),
+            "hold": [_jsonable(e) for e in self.hold], "hold_count": len(self.hold),
             "hold_capacity": self.t["hold_capacity"],
             "nodes": [{"id": n["id"], "pos": n["pos"], "kind": n["kind"],
                        "ready": n["regrow_ticks"] == 0, "regrow_ticks": n["regrow_ticks"]}
@@ -107,6 +138,8 @@ class GatherSim:
                 n["regrow_ticks"] -= 1
                 if n["regrow_ticks"] == 0:
                     events.append(("node_regrown", {"node_id": n["id"]}))
+        # 1b. độ tươi của hàng CÓ SẴN đầu bước (hàng mới vào trong bước này hao từ bước sau)
+        self._decay(events)
         # 2. bơi + chặn mép; so phân vùng đầu/cuối bước -> dive / surface
         was_surface = self._at_surface()
         self._move(inp)
@@ -118,8 +151,12 @@ class GatherSim:
         # 2b. oxy theo d CUỐI bước, ngạt, Máu, ngất
         if self._update_oxygen(now_surface, events):
             return events
-        # 2c. thủy quái theo id, tối đa một hit
+        # 2c. thủy quái theo id, tối đa một hit (lost là cá thể nội bộ -> đổi sang JSON để ghi JSONL)
+        first = len(events)
         self.monster_set.step(self, events)
+        for _, data in events[first:]:
+            if isinstance(data, dict) and isinstance(data.get("lost"), list):
+                data["lost"] = [_jsonable(e) for e in data["lost"]]
         if self.hp <= 0:
             self._faint(events, cause="monster")
             return events
@@ -168,7 +205,7 @@ class GatherSim:
 
     def _faint(self, events, cause="choke"):
         """Máu về 0: mất toàn bộ giỏ, kết thúc buổi với kho rỗng."""
-        lost = list(reversed(self.hold))  # thứ tự bỏ: nhặt sau bỏ trước
+        lost = [_jsonable(e) for e in reversed(self.hold)]  # thứ tự bỏ: nhặt sau bỏ trước
         self.hold = []
         events.append(("faint", {"cause": cause, "lost": lost, "hp": 0}))
         self._finish("fainted", events)
@@ -192,7 +229,7 @@ class GatherSim:
             events.append(("hold_full", {"action": "gather", "node_id": node["id"],
                                          "required": amount, "free": free}))
             return
-        self.hold.extend([node["kind"]] * amount)
+        self._add(node["kind"], amount)
         node["regrow_ticks"] = int(round(self.t["regrow_s"] * TICK))
         events.append(("gather", {"node_id": node["id"], "kind": node["kind"], "amount": amount}))
 
@@ -206,10 +243,26 @@ class GatherSim:
             events.append(("hold_full", {"action": "catch", "fish_id": fish["id"],
                                          "required": amount, "free": free}))
             return
-        self.hold.extend([fish["kind"]] * amount)
+        self._add(fish["kind"], amount)
         self.school.remove(fish)
         self.catch_cd_ticks = int(round(self.t["catch_cooldown_s"] * TICK))
         events.append(("fish_caught", {"fish_id": fish["id"], "kind": fish["kind"], "yield": amount}))
+
+    # --- Phase 3: độ tươi (dùng chonoi/items.py theo ADR 0001) -----------------------
+    def _add(self, kind, amount):
+        """Thêm `amount` món vào giỏ; v1.2 cấp id `I…` theo thứ tự vào giỏ, fresh = initial."""
+        for _ in range(amount):
+            if self._fr is None:
+                self.hold.append(kind)
+            else:
+                self.hold.append(it.new_item(self.ids, kind, fr=self._fr))
+
+    def _decay(self, events):
+        """Hao tươi hàng có sẵn trong giỏ (kẹp 0); phát `spoiled` theo id cho cá thể vừa qua ngưỡng."""
+        if self._fr is None or not self.hold:
+            return
+        for e in it.decay(self.hold, self._fr.gather_per_tick, self._fr):
+            events.append(("spoiled", {"item_id": e["id"], "kind": e["kind"], "location": "hold"}))
 
     # --- tiện ích ---------------------------------------------------------------
     def _at_surface(self) -> bool:
@@ -221,7 +274,10 @@ class GatherSim:
     def _finish(self, reason, events):
         self.done = True
         self.reason = reason
-        events.append(("gather_end", {"reason": reason, "inventory": {"items": self.inventory_items()}}))
+        inv = self.inventory_items()
+        if self._fr is not None:
+            inv = it.list_to_json(inv)  # event JSONL theo schema file kho; runner/day dùng bản nội bộ
+        events.append(("gather_end", {"reason": reason, "inventory": {"items": inv}}))
 
     def _move(self, inp):
         speed = self.t["swim_speed"]
