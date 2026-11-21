@@ -1,9 +1,4 @@
-"""Cá sấu Phase 2: patrol, chase, recoil và va chạm với người chơi.
-
-Module nhận cấu hình đã chuẩn hóa thay vì đọc trực tiếp ``game.contract.json``. Bên tích
-hợp ánh xạ tuning v1.1 vào ``settings`` và danh sách ``monsters``; nhờ vậy luật không
-hard-code số gameplay và không phụ thuộc cách contract nhóm các khóa.
-"""
+"""Cá sấu Phase 2: tuần tra, truy đuổi, recoil và va chạm."""
 
 import math
 
@@ -11,100 +6,121 @@ from ..ids import sort_by_id
 
 
 class MonsterSet:
-    """Quản lý M1/M2 và xét tối đa một va chạm mỗi tick theo thứ tự id."""
+    """Quản lý quái của một buổi gather và xét tối đa một hit mỗi tick."""
 
-    REQUIRED_SETTINGS = {
-        "tick_hz", "patrol_speed", "chase_speed", "chase_radius", "hit_radius",
-        "recoil_distance", "hit_damage", "drop_count", "invuln_ticks",
-    }
-
-    def __init__(self, monsters, settings, bounds):
-        missing = self.REQUIRED_SETTINGS - set(settings)
-        if missing:
-            raise ValueError(f"thiếu tuning monsters: {sorted(missing)}")
-        self.settings = dict(settings)
+    def __init__(self, config, bounds, tick_hz, current_day=1, monsters=None):
+        self.config = config
+        self.species = config["species"]
         self.bounds = bounds
-        self.monsters = []
-        for source in monsters:
-            if "patrol_x" not in source:
-                raise ValueError(f"monster {source.get('id', '?')} thiếu patrol_x")
-            monster = {
-                "id": source["id"],
-                "kind": source.get("kind", "ca_sau"),
-                "pos": [float(c) for c in source["pos"]],
-                "heading_deg": float(source.get("heading_deg", 0)),
-                "patrol_x": [float(c) for c in source["patrol_x"]],
-                "state": source.get("state", "patrol"),
-            }
-            self.monsters.append(monster)
+        self.tick_hz = float(tick_hz)
+        sources = monsters if monsters is not None else [
+            item for item in config["spawns"] if item.get("from_day", 1) <= current_day
+        ]
+        self.monsters = [self._build(item) for item in sources]
         self.monsters = sort_by_id(self.monsters)
 
+    @staticmethod
+    def _build(source):
+        state = source.get("state", "patrol")
+        return {
+            "id": source["id"],
+            "kind": source["kind"],
+            "pos": [float(c) for c in source["pos"]],
+            "waypoints": [[float(c) for c in point] for point in source["waypoints"]],
+            "target_idx": int(source.get("target_idx", 1)),
+            "state": state,
+            "state_ticks_left": int(source.get("state_ticks_left", 0)),
+            "recoil_dir": (list(source["recoil_dir"])
+                           if source.get("recoil_dir") is not None else None),
+        }
+
     def snapshot(self):
-        return [
-            {key: monster[key] for key in ("id", "kind", "pos", "heading_deg", "state")}
-            for monster in sort_by_id(self.monsters)
-        ]
+        result = []
+        for monster in sort_by_id(self.monsters):
+            row = {
+                "id": monster["id"], "kind": monster["kind"],
+                "pos": list(monster["pos"]),
+                "waypoints": [list(point) for point in monster["waypoints"]],
+                "target_idx": monster["target_idx"], "state": monster["state"],
+                "state_ticks_left": monster["state_ticks_left"],
+            }
+            if monster["recoil_dir"] is not None:
+                row["recoil_dir"] = list(monster["recoil_dir"])
+            result.append(row)
+        return result
 
     def step(self, player, events):
-        """Cập nhật chuyển động rồi xét hit; trả id quái đánh trúng hoặc ``None``."""
+        """Cập nhật quái theo id rồi xét hit; trả id quái đánh trúng hoặc ``None``."""
         for monster in sort_by_id(self.monsters):
             self._move(monster, player.pos)
 
         if player.invuln_ticks > 0:
             return None
         for monster in sort_by_id(self.monsters):
-            if math.dist(monster["pos"], player.pos) <= self.settings["hit_radius"]:
+            setting = self.species[monster["kind"]]
+            if math.dist(monster["pos"], player.pos) <= setting["hit_radius"]:
                 self._hit(monster, player, events)
                 return monster["id"]
         return None
 
     def _move(self, monster, player_pos):
-        distance = math.dist(monster["pos"], player_pos)
-        if distance <= self.settings["chase_radius"]:
-            monster["state"] = "chase"
-            self._move_toward(monster, player_pos, self.settings["chase_speed"])
-        else:
-            monster["state"] = "patrol"
-            self._patrol(monster)
-        self._clamp(monster["pos"])
+        setting = self.species[monster["kind"]]
+        if monster["state"] in {"recoil", "stunned"}:
+            self._timed_state(monster, setting)
+            return
 
-    def _move_toward(self, monster, target, speed):
-        dx = target[0] - monster["pos"][0]
-        dd = target[1] - monster["pos"][1]
+        distance = math.dist(monster["pos"], player_pos)
+        if monster["state"] == "chase":
+            if distance > setting["exit_radius"]:
+                monster["state"] = "patrol"
+            else:
+                self._move_toward(monster["pos"], player_pos, setting["chase_speed"])
+                return
+        if monster["state"] == "patrol" and distance <= setting["detect_radius"]:
+            monster["state"] = "chase"
+            self._move_toward(monster["pos"], player_pos, setting["chase_speed"])
+            return
+        self._patrol(monster, setting["patrol_speed"])
+
+    def _patrol(self, monster, speed):
+        target = monster["waypoints"][monster["target_idx"]]
+        reached = self._move_toward(monster["pos"], target, speed)
+        if reached:
+            monster["target_idx"] = 1 - monster["target_idx"]
+
+    def _timed_state(self, monster, setting):
+        if monster["state"] == "recoil":
+            per_tick = float(setting["recoil_dist"]) / int(setting["recoil_ticks"])
+            direction = monster["recoil_dir"]
+            monster["pos"][0] += direction[0] * per_tick
+            monster["pos"][1] += direction[1] * per_tick
+            self._clamp(monster["pos"])
+        monster["state_ticks_left"] = max(0, monster["state_ticks_left"] - 1)
+        if monster["state_ticks_left"] == 0:
+            monster["state"] = "patrol"
+            monster["recoil_dir"] = None
+
+    def _move_toward(self, pos, target, speed):
+        dx, dd = target[0] - pos[0], target[1] - pos[1]
         distance = math.hypot(dx, dd)
         if distance == 0:
-            return
-        step = min(float(speed) / float(self.settings["tick_hz"]), distance)
-        monster["pos"][0] += dx / distance * step
-        monster["pos"][1] += dd / distance * step
-        monster["heading_deg"] = math.degrees(math.atan2(dd, dx)) % 360
-
-    def _patrol(self, monster):
-        lo, hi = monster["patrol_x"]
-        direction = 1 if math.cos(math.radians(monster["heading_deg"])) >= 0 else -1
-        x = monster["pos"][0] + direction * (
-            float(self.settings["patrol_speed"]) / float(self.settings["tick_hz"])
-        )
-        while x < lo or x > hi:
-            if x > hi:
-                x = hi - (x - hi)
-                direction = -1
-            elif x < lo:
-                x = lo + (lo - x)
-                direction = 1
-        monster["pos"][0] = x
-        monster["heading_deg"] = 0.0 if direction > 0 else 180.0
+            return True
+        step = min(float(speed) / self.tick_hz, distance)
+        pos[0] += dx / distance * step
+        pos[1] += dd / distance * step
+        self._clamp(pos)
+        return step == distance
 
     def _hit(self, monster, player, events):
-        player.hp = max(0, player.hp - int(self.settings["hit_damage"]))
-        lost = []
-        for _ in range(min(int(self.settings["drop_count"]), len(player.hold))):
-            lost.append(player.hold.pop())
-        player.invuln_ticks = int(self.settings["invuln_ticks"])
+        setting = self.species[monster["kind"]]
+        player.hp = max(0, player.hp - 1)
+        drop_count = math.ceil(len(player.hold) * float(self.config["loss_ratio"]))
+        lost = [player.hold.pop() for _ in range(drop_count)]
+        player.invuln_ticks = int(self.config["invuln_ticks"])
         events.append(("monster_hit", {
             "monster_id": monster["id"], "hp": player.hp, "lost": lost,
         }))
-        self._recoil(monster, player.pos)
+        self._start_recoil(monster, player.pos, setting)
 
         if player.hp > 0:
             return
@@ -116,19 +132,20 @@ class MonsterSet:
         if hasattr(player, "_finish"):
             player._finish("fainted", events)
 
-    def _recoil(self, monster, player_pos):
+    def _start_recoil(self, monster, player_pos, setting):
         dx = monster["pos"][0] - player_pos[0]
         dd = monster["pos"][1] - player_pos[1]
         distance = math.hypot(dx, dd)
         if distance == 0:
-            angle = math.radians(monster["heading_deg"] + 180)
-            dx, dd, distance = math.cos(angle), math.sin(angle), 1.0
-        amount = float(self.settings["recoil_distance"])
-        monster["pos"][0] += dx / distance * amount
-        monster["pos"][1] += dd / distance * amount
-        monster["heading_deg"] = math.degrees(math.atan2(dd, dx)) % 360
+            target = monster["waypoints"][1 - monster["target_idx"]]
+            dx = target[0] - monster["pos"][0]
+            dd = target[1] - monster["pos"][1]
+            distance = math.hypot(dx, dd)
+        if distance == 0:
+            dx, dd, distance = -1.0, 0.0, 1.0
         monster["state"] = "recoil"
-        self._clamp(monster["pos"])
+        monster["state_ticks_left"] = int(setting["recoil_ticks"])
+        monster["recoil_dir"] = [dx / distance, dd / distance]
 
     def _clamp(self, pos):
         pos[0] = min(max(pos[0], self.bounds["x"][0]), self.bounds["x"][1])
