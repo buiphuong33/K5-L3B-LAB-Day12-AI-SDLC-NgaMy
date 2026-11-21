@@ -23,23 +23,16 @@ python3 -m chonoi.live --mode gather                                # chơi th�
 
 Game cần chế độ **headless** theo Test Contract (`python3 -m chonoi.headless --mode gather|quan …`) để được chạy và chấm tự động. **Công nghệ không ràng buộc**: khung Python trong `chonoi/` chỉ là gợi ý, chi tiết ở [`docs/STARTER.md`](docs/STARTER.md).
 
-## Game của nhóm NgaMy
+## Cách chơi và tính điểm
 
-**Chạy từ clone sạch (macOS/Linux, Python ≥ 3.9, không cần cài thêm):**
-```bash
-git clone https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy && cd K5-L3B-LAB-Day12-AI-SDLC-NgaMy
-python3 -m chonoi.live --mode gather     # hoặc --mode quan; mở địa chỉ in ra
-PYTHONPATH=tests:. python3 -m unittest discover -s tests -v   # toàn bộ test, 1 lệnh
-```
+- **Điều khiển:** WASD hoặc mũi tên để bơi/đi, **E** để hái, cập bến, nấu, bưng, phục vụ, **Space** để bắt cá khi lặn, **R** để chơi lại.
+- **Nối hai buổi:** `python3 -m chonoi.live --mode gather --inventory-out kho.json`, cập bến, rồi `python3 -m chonoi.live --mode quan --inventory kho.json`.
+- **Điểm:** `earned + 100 × floor(uy tín)`, với `earned` là tổng tiền thu trong lượt (nghìn đồng).
+- **Test (1 lệnh):** `PYTHONPATH=tests:. python3 -m unittest discover -s tests -v`.
 
-**Điều khiển:** WASD / mũi tên bơi hoặc đi · **E** cập bến, hái (sáng), nấu/bưng/phục vụ (tối) · **Space** bắt cá · **R** chơi lại.
+## Sáng tạo của nhóm
 
-**Cách tính điểm:** `score = earned + 100 × floor(reputation)`. `earned` là tổng tiền thu (nghìn đồng, gồm boa). Uy tín bắt đầu 3.0, +0.2 mỗi lần được boa, −0.5 mỗi khách bỏ về vì hết kiên nhẫn, kẹp trong [0, 5].
-
-**Nối hai buổi:** buổi sáng ghi kho bằng `--inventory-out`, buổi tối đọc bằng `--inventory`. Hợp đồng kho và sự kiện ở [`docs/contracts/`](docs/contracts/README.md).
-
-### Sáng tạo của nhóm
-- (chưa có; lõi làm trước)
+Phase 1 chưa thêm phần sáng tạo, nhóm ưu tiên làm đúng lõi.
 
 ## Tự do sáng tạo
 

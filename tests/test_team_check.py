@@ -24,9 +24,9 @@ class TeamCheck(unittest.TestCase):
         self.assertEqual(check_team.validate(m, 4, actor="an-nguyen", event="pull_request"), [])
 
     def test_template_is_rejected(self):
-        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "TEAM.md"), encoding="utf-8") as f:
-            m = check_team.parse_team(f.read())
-        self.assertTrue(check_team.validate(m, 4))
+        # Dùng bảng mẫu cố định: TEAM.md thật của nhóm đã điền đủ nên phải hợp lệ.
+        template = GOOD.replace("@an-nguyen", "…").replace("binh-tran", "…")
+        self.assertTrue(check_team.validate(check_team.parse_team(template), 4))
 
     def test_wrong_size_duplicate_and_outsider(self):
         m = check_team.parse_team(GOOD)
