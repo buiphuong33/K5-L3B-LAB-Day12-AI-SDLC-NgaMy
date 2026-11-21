@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from chonoi import bench
+from helpers import ROOT
 
 
 class BenchUnit(unittest.TestCase):
@@ -55,6 +56,20 @@ class BenchUnit(unittest.TestCase):
             with mock.patch.object(bench, "run_benchmark", return_value=result) as run:
                 self.assertEqual(bench.main(["--seed", "7", "--duration", "1", "--out", path]), 0)
             run.assert_called_once_with(7, 1.0, path)
+
+
+class BenchArtifact(unittest.TestCase):
+    def test_committed_run_has_contract_shape_and_full_duration(self):
+        path = os.path.join(ROOT, "docs", "proof", "phase-4", "bench.json")
+        with open(path, encoding="utf-8") as source:
+            result = json.load(source)
+
+        self.assertEqual(set(result), set(bench.FIELDS))
+        self.assertGreaterEqual(result["measured_s"], 30)
+        self.assertGreater(result["frames"], 0)
+        self.assertGreater(result["avg_fps"], 0)
+        self.assertGreater(result["p1_low_fps"], 0)
+        self.assertGreater(result["load_ms"], 0)
 
 
 if __name__ == "__main__":
