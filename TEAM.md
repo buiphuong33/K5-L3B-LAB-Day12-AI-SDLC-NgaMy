@@ -7,7 +7,7 @@
 | Phương (trưởng nhóm) | … | `client/ui` | Integrator, Release | Huyền |
 | Tâm | … | `sim/gather` | PO | Nga |
 | Nga | Ngahoang2005 | `sim/quan` | Scrum | Tâm |
-| Huyền | … | `qa` | QA lead | Phương |
+| Dương Thị Huyền - 2A202604077 | duongthuyen | `qa` | QA lead | Phương |
 
 **Vai quy trình:** PO (đầu mối hỏi giảng viên, giữ `docs/clarify.md`) · Integrator (giữ `docs/contracts/`, gắn tag) · QA lead · Scrum/Release. Có thể kiêm.
 
@@ -20,7 +20,7 @@ Mỗi file chỉ có **một người sửa**. Cần đổi file của người 
 | **Phương** | `chonoi/web/`, `chonoi/live.py`, `chonoi/contract.py`, `chonoi/sim/ramp.py`, `game.contract.json`, các file khung còn lại của `chonoi/` | `TEAM.md`, `README.md`, `CHANGELOG.md`, `CREDITS.md`, `docs/contracts/`, `docs/adr/`, `docs/plan/` | HUD và đồ họa, chốt hợp đồng tích hợp, gộp code, gắn tag `phase-1` … `phase-4`, Release `v1.0.0` |
 | **Tâm** | `chonoi/sim/gather.py` | `docs/clarify.md`, `AGENTS.md` | Lát 1 (bơi, oxy, ngạt, Máu, ngất, giỏ LIFO), lát 2 (hái, bắt cá, cập bến, xuất kho) |
 | **Nga** | `chonoi/sim/quan.py`, `chonoi/scenario.py` | `docs/standup.md`, `docs/retro.md`, `docs/ai-usage-log.md` | Lát 3 (khách, giữ chỗ, kiên nhẫn, `no_dish`), lát 4 (bếp, bưng, phục vụ, tiền, boa, uy tín, hết ca), kiểm mâu thuẫn scenario |
-| **Huyền** | `tests/`, `tools/`, `.github/`, `.agents/skills/` | `docs/verification/`, `docs/proof/` | Test theo từng AC, kiểm tất định (cùng seed giống từng byte), ma trận truy vết, ít nhất 2 skill của nhóm |
+| **Dương Thị Huyền** | `tests/`, `tools/`, `.github/`, `.agents/skills/` | `docs/verification/`, `docs/proof/` | Test theo từng AC, kiểm tất định (cùng seed giống từng byte), ma trận truy vết, ít nhất 2 skill của nhóm |
 
 Việc riêng của **mọi người**: tối thiểu 3 commit có nội dung và tự viết `docs/members/<handle>.md`. Nhật ký dùng AI gửi cho Nga để ghi vào một chỗ, tránh conflict.
 
