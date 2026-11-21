@@ -30,6 +30,10 @@ from .ramp import ramp_velocity
 
 TICK = 60.0
 AXES = ("x", "d")
+# Biểu diễn độ tươi bằng số nguyên để so ngưỡng 30 chính xác (TICKET-03; khớp `chonoi/items.py`):
+# 240 đơn vị mỗi điểm -> gather trừ 2 đơn vị/tick, ươn khi < 7200. Đây là đơn vị nội bộ, không phải luật.
+FRESH_UNIT = 240
+ITEM_PREFIX = "I"  # id cá thể dùng chung IdAllocator, tăng xuyên pha và Ngày
 
 
 class GatherSim:
@@ -53,7 +57,17 @@ class GatherSim:
         self.zero_oxy_ticks = p.get("zero_oxy_ticks", 0)
         self.invuln_ticks = p.get("invuln_ticks", 0)
         self.catch_cd_ticks = p.get("catch_cd_ticks", 0)
-        self.hold = list(scenario.get("hold", []))  # thứ tự nhặt, cuối mảng là mới nhất
+        # Độ tươi (TICKET-03, contract v1.2): có khối `freshness` -> giỏ chứa cá thể {id, kind, fresh};
+        # không có -> giỏ là mảng tên loài như v1.1 (giữ main chạy được tới lúc bật v1.2).
+        self._fresh = self._fresh_config(tuning)
+        self._fresh_u = {}  # id cá thể -> độ tươi tính bằng đơn vị nguyên (FRESH_UNIT mỗi điểm)
+        self.hold = []      # thứ tự vào giỏ, cuối mảng là mới nhất (LIFO khi mất hàng)
+        for e in scenario.get("hold", []):
+            if self._fresh is None:
+                self.hold.append(e)
+            else:
+                ids.reserve(e["id"])
+                self._put(e["id"], e["kind"], int(round(float(e["fresh"]) * FRESH_UNIT)))
         self.time_left_ticks = scenario.get("time_left_ticks", int(round(t["duration_s"] * TICK)))
         # nút và đàn cá: scenario THAY THẾ danh sách mặc định; random_fish=false tắt cá mặc định
         src_nodes = scenario["nodes"] if "nodes" in scenario else t["nodes"]
@@ -75,8 +89,11 @@ class GatherSim:
         self.reason = None
 
     # --- giao diện cho runner -------------------------------------------------
-    def inventory_items(self) -> dict:
-        return hold_to_items(self.hold)
+    def inventory_items(self):
+        """v1.2: mảng cá thể {id, kind, fresh} sắp theo id. v1.1: object đếm theo loài."""
+        if self._fresh is None:
+            return hold_to_items(self.hold)
+        return [dict(e) for e in sort_by_id(self.hold)]
 
     def snapshot(self) -> dict:
         return {
@@ -107,6 +124,8 @@ class GatherSim:
                 n["regrow_ticks"] -= 1
                 if n["regrow_ticks"] == 0:
                     events.append(("node_regrown", {"node_id": n["id"]}))
+        # 1b. độ tươi của hàng CÓ SẴN đầu bước (hàng mới vào trong bước này hao từ bước sau)
+        self._decay(events)
         # 2. bơi + chặn mép; so phân vùng đầu/cuối bước -> dive / surface
         was_surface = self._at_surface()
         self._move(inp)
@@ -192,7 +211,7 @@ class GatherSim:
             events.append(("hold_full", {"action": "gather", "node_id": node["id"],
                                          "required": amount, "free": free}))
             return
-        self.hold.extend([node["kind"]] * amount)
+        self._add(node["kind"], amount)
         node["regrow_ticks"] = int(round(self.t["regrow_s"] * TICK))
         events.append(("gather", {"node_id": node["id"], "kind": node["kind"], "amount": amount}))
 
@@ -206,10 +225,49 @@ class GatherSim:
             events.append(("hold_full", {"action": "catch", "fish_id": fish["id"],
                                          "required": amount, "free": free}))
             return
-        self.hold.extend([fish["kind"]] * amount)
+        self._add(fish["kind"], amount)
         self.school.remove(fish)
         self.catch_cd_ticks = int(round(self.t["catch_cooldown_s"] * TICK))
         events.append(("fish_caught", {"fish_id": fish["id"], "kind": fish["kind"], "yield": amount}))
+
+    # --- Phase 3: độ tươi --------------------------------------------------------
+    @staticmethod
+    def _fresh_config(tuning):
+        """Đổi khối `freshness` (điểm, điểm/giây) sang đơn vị nguyên mỗi tick; None nếu chưa có v1.2."""
+        f = tuning.get("freshness")
+        if f is None:
+            return None
+        tick_hz = float(tuning.get("tick_hz", TICK))
+        return {
+            "initial": int(round(f["initial"] * FRESH_UNIT)),
+            "decay": int(round(f["gather_decay_per_s"] * FRESH_UNIT / tick_hz)),  # 0.5/s -> 2/tick
+            "spoiled_below": int(round(f["spoiled_below"] * FRESH_UNIT)),         # 30 -> 7200
+        }
+
+    def _put(self, item_id, kind, units):
+        self._fresh_u[item_id] = units
+        self.hold.append({"id": item_id, "kind": kind, "fresh": units / FRESH_UNIT})
+
+    def _add(self, kind, amount):
+        """Thêm `amount` món vào giỏ; v1.2 cấp id `I…` theo thứ tự vào giỏ, fresh = initial."""
+        for _ in range(amount):
+            if self._fresh is None:
+                self.hold.append(kind)
+            else:
+                self._put(self.ids.new(ITEM_PREFIX), kind, self._fresh["initial"])
+
+    def _decay(self, events):
+        """Hao tươi mọi cá thể trong giỏ, kẹp đáy 0; phát `spoiled` theo id khi vừa qua ngưỡng."""
+        if self._fresh is None or not self.hold:
+            return
+        cfg = self._fresh
+        for e in sort_by_id(self.hold):
+            before = self._fresh_u[e["id"]]
+            after = max(0, before - cfg["decay"])
+            self._fresh_u[e["id"]] = after
+            e["fresh"] = after / FRESH_UNIT
+            if before >= cfg["spoiled_below"] > after:
+                events.append(("spoiled", {"item_id": e["id"], "kind": e["kind"], "location": "hold"}))
 
     # --- tiện ích ---------------------------------------------------------------
     def _at_surface(self) -> bool:
