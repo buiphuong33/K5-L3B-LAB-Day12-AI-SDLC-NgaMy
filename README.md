@@ -26,6 +26,9 @@ rồi `python3 -m chonoi.live --mode quan --inventory kho.json`.
 
 - **Python 3.10 trở lên**, chỉ dùng thư viện chuẩn (không `pip install`). Lệnh trong README dùng `python3`.
 - **Trình duyệt** hiện đại (Chrome, Firefox, Safari, Edge) để chơi bản có giao diện.
+- **Chromium / Google Chrome / Microsoft Edge** để chạy benchmark: bench mở game ở chế độ headless và tự tìm
+  lệnh `chromium`, `chromium-browser`, `google-chrome`, `chrome`, `msedge` hoặc đường dẫn cài đặt mặc định trên
+  macOS/Windows. Firefox/Safari không dùng được cho bench.
 - **git** để clone và để chạy script đóng gói.
 - Đã thử trên Windows 11 (Python 3.13): dùng `python` thay `python3` nếu máy không có lệnh `python3`, và
   `PYTHONPATH=tests;.` thay cho `tests:.` khi chạy test.
@@ -76,6 +79,9 @@ làm nóng 3 s rồi đo 30 s):
 ```bash
 python3 -m chonoi.bench --seed 42 --duration 30 --out bench.json
 ```
+
+Cần Chromium, Chrome hoặc Edge (xem **Yêu cầu môi trường**). Nếu trình duyệt nằm ở chỗ khác, chỉ đường dẫn bằng
+biến môi trường, ví dụ `CHONOI_BROWSER=/usr/bin/chromium python3 -m chonoi.bench --seed 42 --duration 30 --out bench.json`.
 
 `bench.json` có `avg_fps`, `p1_low_fps`, `frames`, `measured_s`, `load_ms`. Kết quả đo trên commit phát hành:
 [`docs/proof/phase-4/`](docs/proof/phase-4/).
