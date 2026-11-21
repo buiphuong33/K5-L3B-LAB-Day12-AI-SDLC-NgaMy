@@ -19,7 +19,8 @@ Giao ước với gather/quan (không sửa file của Tâm/Nga):
 
 import copy
 
-from ..ids import IdAllocator
+from ..ids import IdAllocator, sort_by_id
+from ..items import PREFIX, list_to_json
 from .gather import GatherSim
 from .quan import QuanSim
 
@@ -92,10 +93,24 @@ class DaySim:
         self._emit(events, "day_start", {})
         p = self.plan[self.day]
         self._emit(events, "day_plan", {"dishes": dict(p["dishes"]), "ingredients": dict(p["ingredients"])})
-        self.sub = GatherSim(t, copy.deepcopy(self.g_template), self.streams, self.ids)
+        self.sub = GatherSim(t, self._gather_template(), self.streams, self.ids)
         self._emit(events, "phase_start", {})
 
+    def _gather_template(self):
+        """v1.2: Ngày 1 giữ nguyên id trong mẫu gather.hold; Ngày kế cấp id mới (họ "I") theo thứ tự mảng,
+        giữ kind/fresh ban đầu. Mẫu kiểu cũ (mảng kind) để nguyên cho gather tự xử lý."""
+        g = copy.deepcopy(self.g_template)
+        hold = g.get("hold")
+        if isinstance(hold, list) and hold and isinstance(hold[0], dict):
+            if self.day == 1:
+                for it in hold:
+                    self.ids.reserve(it["id"])
+            else:
+                g["hold"] = [dict(it, id=self.ids.new(PREFIX)) for it in hold]
+        return g
+
     def _start_quan(self, events, inventory):
+        """Bàn giao trong CÙNG tick: truyền nguyên list cá thể nội bộ (không làm tròn, không hao thêm)."""
         t = copy.deepcopy(self.day_tuning)
         dishes = self.plan[self.day]["dishes"]
         t["menu"] = {k: v for k, v in t["menu"].items() if k in dishes}
@@ -109,7 +124,10 @@ class DaySim:
     def _start_shop(self, events):
         q = self.sub
         self.money, self.earned, self.reputation = q.money, q.earned, q.reputation
-        self.leftover = {k: v for k, v in sorted(q.stock.items()) if v > 0}
+        if isinstance(q.stock, list):  # v1.2: kho dư là cá thể, Shop không hao tươi
+            self.leftover = sort_by_id([dict(i) for i in q.stock])
+        else:
+            self.leftover = {k: v for k, v in sorted(q.stock.items()) if v > 0}
         self.sub = None
         self.phase = "shop"
         self.phase_tick = 0
@@ -187,7 +205,7 @@ class DaySim:
              "active_upgrades": dict(sorted(self.active_upgrades.items())),
              "days_completed": self.days_completed}
         if self.phase == "shop":
-            s["stock"] = dict(self.leftover)
+            s["stock"] = list_to_json(self.leftover) if isinstance(self.leftover, list) else dict(self.leftover)
         else:
             s.update(self.sub.snapshot())
         return s

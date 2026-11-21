@@ -110,6 +110,16 @@ const UPGRADE_NAME = { oxygen: "Bình oxy", hp: "Áo phao" };
 const STOVE_STATE = { idle: "rảnh", cooking: "đang nấu", ready: "món chín" };
 const dname = (d) => DISH_NAME[d] || d;
 const kc = (k) => KIND_COLOR[k] || "#bbbbbb";
+// v1.2: giỏ/kho là mảng cá thể {id, kind, fresh}; v1.1: mảng kind / object đếm. Đọc được cả hai.
+const SPOIL = 30;
+const kindOf = (x) => (typeof x === "string" ? x : x.kind);
+const isSpoiled = (x) => typeof x === "object" && x.fresh < SPOIL;
+function countOf(stock, usableOnly) {          // → {kind: số}
+  if (!stock) return {};
+  if (!Array.isArray(stock)) return Object.assign({}, stock);
+  const c = {}; stock.forEach((x) => { if (!usableOnly || !isSpoiled(x)) c[kindOf(x)] = (c[kindOf(x)] || 0) + 1; }); return c;
+}
+function freshColor(f) { return f < SPOIL ? "#8d6e63" : f < 60 ? "#ffb74d" : "#81c784"; }
 
 function fit() {
   const dpr = window.devicePixelRatio || 1;
@@ -250,7 +260,7 @@ function drawGather(w, h) {
   }
   // danh sách cần lấy (đã lấy / cần)
   if (snap.day_plan) {
-    const got = {}; (snap.hold || []).forEach((k) => (got[k] = (got[k] || 0) + 1));
+    const got = countOf(snap.hold, true);
     const ing = snap.day_plan.ingredients;
     text(`Ngày ${snap.day} · Má Tư cần:`, w - 10, 28, { align: "right", color: "#ffe9a8" });
     Object.keys(ing).forEach((k, i) => {
@@ -264,10 +274,21 @@ function drawGather(w, h) {
     for (let i = 0; i < cap; i++) {
       const x0 = 14 + i * (sz + 4);
       ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.fillRect(x0, y0, sz, sz);
-      if (snap.hold[i]) { ctx.fillStyle = kc(snap.hold[i]); ctx.fillRect(x0 + 3, y0 + 3, sz - 6, sz - 6); }
+      const it = snap.hold[i];
+      if (it) {
+        ctx.globalAlpha = isSpoiled(it) ? 0.35 : 1;
+        ctx.fillStyle = kc(kindOf(it)); ctx.fillRect(x0 + 3, y0 + 3, sz - 6, sz - 6); ctx.globalAlpha = 1;
+        if (typeof it === "object") {
+          ctx.fillStyle = freshColor(it.fresh); ctx.fillRect(x0, y0 + sz - 4, sz * it.fresh / 100, 4);
+          if (isSpoiled(it)) { ctx.strokeStyle = "#ff5252"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0 + 3, y0 + 3); ctx.lineTo(x0 + sz - 3, y0 + sz - 3); ctx.stroke(); ctx.lineWidth = 1; }
+        }
+      }
     }
-    const names = {}; snap.hold.forEach((k) => (names[k] = (names[k] || 0) + 1));
-    text("Giỏ " + snap.hold.length + "/" + cap + "  " + Object.keys(names).map((k) => (KIND_NAME[k] || k) + "×" + names[k]).join(", "), 14, y0 + sz + 20, { color: "#cfd8dc" });
+    const names = countOf(snap.hold, false), bad = snap.hold.filter(isSpoiled).length;
+    const objs = snap.hold.filter((x) => typeof x === "object");
+    const minF = objs.length ? Math.min(...objs.map((x) => x.fresh)) : null;
+    text("Giỏ " + snap.hold.length + "/" + cap + "  " + Object.keys(names).map((k) => (KIND_NAME[k] || k) + "×" + names[k]).join(", ")
+      + (minF !== null ? `  · tươi thấp nhất ${minF.toFixed(1)}` : "") + (bad ? `  · ${bad} ươn ✗` : ""), 14, y0 + sz + 20, { color: bad ? "#ffab91" : "#cfd8dc" });
   }
   text("WASD bơi · E hái/cập bến · Space bắt · Esc tạm dừng", w - 10, h - 14, { align: "right", color: "#9fb3c0" });
 }
@@ -324,9 +345,20 @@ function drawQuan(w, h) {
   const shift = snap.stats && snap.stats.money_start != null ? ` · tiền ca ${snap.money - snap.stats.money_start}k` : "";
   text(`Tiền ${snap.money ?? 0}k${shift} · uy tín ${(snap.reputation ?? 0).toFixed(1)} · điểm ${snap.score ?? 0}`, 110, 30, { size: 20 });
   // Kho khả dụng = tồn vật lý − phần khách đang giữ chỗ
-  const avail = Object.assign({}, snap.stock || {});
-  (snap.customers || []).forEach((c) => Object.entries(c.reserved || {}).forEach(([k, n]) => (avail[k] = (avail[k] || 0) - n)));
-  const stock = Object.keys(avail).sort().map((k) => (KIND_NAME[k] || k) + " " + avail[k] + "/" + (snap.stock[k] || 0)).join(", ");
+  const avail = countOf(snap.stock, true), total = countOf(snap.stock, false);
+  const held = new Set();
+  (snap.customers || []).forEach((c) => {
+    if (Array.isArray(c.reserved)) c.reserved.forEach((id) => held.add(id));
+    else Object.entries(c.reserved || {}).forEach(([k, n]) => (avail[k] = (avail[k] || 0) - n));
+  });
+  if (Array.isArray(snap.stock)) snap.stock.forEach((x) => { if (held.has(x.id) && !isSpoiled(x)) avail[x.kind] -= 1; });
+  const minFresh = {}, spoiled = {};
+  if (Array.isArray(snap.stock)) snap.stock.forEach((x) => {
+    if (isSpoiled(x)) spoiled[x.kind] = (spoiled[x.kind] || 0) + 1;
+    else minFresh[x.kind] = Math.min(minFresh[x.kind] ?? 100, x.fresh);
+  });
+  const stock = Object.keys(total).sort().map((k) => (KIND_NAME[k] || k) + " " + (avail[k] || 0) + "/" + total[k]
+    + (minFresh[k] !== undefined ? ` (${Math.floor(minFresh[k])}%)` : "") + (spoiled[k] ? ` ${spoiled[k]} ươn` : "")).join(", ");
   text("Kho khả dụng/tồn: " + (stock || "(trống)"), 14, 56, { color: "#cfd8dc" });
   // Bảng trạng thái góc phải: bếp, tay, món gọi + kiên nhẫn
   const lines = [];
@@ -343,7 +375,7 @@ function panel(w, h, pw, ph) {
   ctx.strokeStyle = "#f2c230"; ctx.lineWidth = 2; ctx.strokeRect((w - pw) / 2, (h - ph) / 2, pw, ph); ctx.lineWidth = 1;
   return [(w - pw) / 2, (h - ph) / 2];
 }
-const items = (m) => Object.keys(m || {}).map((k) => (KIND_NAME[k] || k) + " ×" + m[k]).join(", ") || "(trống)";
+const items = (m) => { const c = countOf(m, false); return Object.keys(c).map((k) => (KIND_NAME[k] || k) + " ×" + c[k]).join(", ") || "(trống)"; };
 function drawShop(w, h) {
   ctx.fillStyle = "#2b1d12"; ctx.fillRect(0, 0, w, h);
   const [x0, y0] = panel(w, h, 760, 400);
@@ -393,7 +425,7 @@ function drawScreen(w, h, kind) {
   } else if (kind === "evening_intro") {
     T("Chiều tối — mở quán", 0, { size: 32, color: "#f2c230" });
     T("Nhập kho: " + items(st.stock_in), 1.5, { size: 18 });
-    const menu = (snap.meta || {}).menu || {}, ds = (snap.day_plan || {}).dishes || {}, stock = snap.stock || {};
+    const menu = (snap.meta || {}).menu || {}, ds = (snap.day_plan || {}).dishes || {}, stock = countOf(snap.stock, true);
     T("Món nấu được:", 2.7);
     Object.keys(ds).forEach((d, i) => {
       const r = (menu[d] || {}).recipe || {};

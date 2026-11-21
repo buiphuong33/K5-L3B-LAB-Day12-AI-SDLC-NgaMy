@@ -12,6 +12,7 @@ import math
 from .ids import IdAllocator
 from .inputs import InputPlayer
 from .inventory import write_inventory
+from .items import reserve_ids
 from .jsonl import JsonlWriter
 from .rng import Streams
 from .sim.gather import GatherSim
@@ -25,6 +26,8 @@ def build_sim(mode, tuning, scenario, seed, inventory, days=1):
         return GatherSim(tuning, scenario, streams, ids)
     if mode == "day":
         return DaySim(tuning, scenario, streams, days)
+    if isinstance(inventory, list):  # v1.2: kho cá thể → id mới nối sau hậu tố lớn nhất đã nạp
+        reserve_ids(ids, inventory)
     return QuanSim(tuning, scenario, streams, ids, inventory=inventory)
 
 
