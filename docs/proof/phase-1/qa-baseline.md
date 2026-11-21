@@ -24,5 +24,5 @@ Test mới `tests/test_determinism.py` xác nhận hai lần chạy cùng seed c
 
 ## Việc còn mở
 
-- `tools/check_team.py` chưa đạt vì GitHub handle của Phương, Tâm và Huyền vẫn để trống. Không tự đoán handle; từng thành viên cần cung cấp để Phương cập nhật `TEAM.md`.
+- `tools/check_team.py` chưa đạt vì GitHub handle của Phương và Tâm vẫn để trống. Không tự đoán handle; từng thành viên cần cung cấp để Phương cập nhật `TEAM.md`.
 - Hai skill trong `tools/skills/` đã được rà cấu trúc và YAML frontmatter thủ công. `quick_validate.py` của Codex chưa chạy được vì Python cục bộ thiếu package `yaml` (PyYAML).
