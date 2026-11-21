@@ -1,14 +1,7 @@
-# Nga (Ngahoang2005)
+# Nga (Ngahoang2005) — phản tư cá nhân
 
-## Phần việc
-
-- `chonoi/sim/quan.py`: khách, đơn và giữ chỗ nguyên liệu; nấu, bưng, phục vụ; thanh toán, boa, uy tín và hết ca.
-- `chonoi/scenario.py`: kiểm dữ liệu quán và các trạng thái khách/bếp mâu thuẫn.
-- `docs/standup.md`, `docs/retro.md`, `docs/ai-usage-log.md`: ghi tiến độ, retrospective và cách dùng AI.
-
-## Bàn giao Phase 1
-
-- Mô phỏng dùng `Streams` cho lựa chọn món, `IdAllocator` cho khách sinh mới và `sort_by_id` cho thứ tự ổn định.
-- Tuning (giá, thời gian, bán kính, boa, uy tín, giới hạn) đọc từ contract/menu.
-- Đã nhận PRD-0 đầy đủ trong `Pasted text.txt` và căn chỉnh schema đơn, event, thứ tự timer/tương tác/đóng ca theo mục D–F.
-- Lệnh test và kết quả được ghi ở phần báo cáo bàn giao của lượt làm việc này; không tự tạo commit thay cho Nga.
+- **Tôi đã làm:** luật quán/scenario P1–P3 ([`7a9949a`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/7a9949a), tích hợp v1.2 [`3973760`](https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy/commit/3973760)); Phase 4 thêm `chonoi/soak.py`, test và [`soak.json`](../proof/phase-4/soak.json). Commit Phase 4 sẽ do tôi tự bổ sung.
+- **Tôi đã rà:** tag `phase-2` có; hành động chơi thử để xác nhận HUD vẫn chưa có bằng chứng.
+- **AI sai:** soak đầu tiên tái dùng nguyên liệu D1 cho mọi ngày. Tôi phát hiện khi so fixture với kế hoạch từng ngày và sửa bot để nạp đúng nguyên liệu.
+- **Bài học:** kiểm dữ liệu đầu vào ở từng chuyển pha và kết quả lặp seed, không chỉ kiểm tra đủ số ngày.
+- Token theo người không được đo; tôi không ước lượng.

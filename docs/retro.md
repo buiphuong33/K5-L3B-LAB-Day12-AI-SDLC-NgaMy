@@ -23,8 +23,12 @@
 - 1 hành động cho Phase 4 (Huyền): chạy smoke trên bản tích hợp ngay khi có hai lát trở lên, không chờ cuối phase.
 
 ## Phase 4 (cuối)
-- Rà lại hành động Phase 2: đã làm chưa? vì sao?
-- Điều tốt / điều tệ:
-- Số liệu: số commit theo người, cách đọc code của nhau, token theo người:
-- Một lần AI sai và cách nhóm phát hiện:
-- Nếu làm lại, đổi gì:
+- **Hành động Phase 2:** tag `phase-2` có trong repo; standup vẫn ghi chưa xác nhận HUD qua chơi thử trình duyệt. Hành động chơi thử còn mở, không coi là hoàn tất chỉ vì mã HUD có mặt.
+- **Hành động Phase 3 của Nga:** hoàn tất sau khi v1.2 được gộp; smoke file và `day` được ghi trong [`docs/proof/phase-3/integration.md`](proof/phase-3/integration.md).
+- **Điều tốt:** soak gọi trực tiếp `DaySim`, dùng seed cố định, chạy 10 ngày trong khoảng 4 giây; D1–D5 lặp lại chính xác cho D6–D10. Artifact ghi 10/10 ngày, 0 crash. Fixture gather cấp đúng nguyên liệu kế hoạch rồi bot tự điều khiển bếp/phục vụ; đây là soak luồng ngày, không đo kỹ năng tự tìm cá.
+- **Lệnh tái tạo:** `python3 -m chonoi.soak --seed 17 --days 10 --out docs/proof/phase-4/soak.json`.
+- **Điều cần cải thiện:** ban đầu bot dùng lại lượng nguyên liệu D1 cho cả buổi, không khớp kế hoạch từng ngày. So sánh fixture với `day_plan` phát hiện lỗi; runner hiện thay fixture trước khi mở mỗi ngày.
+- **Đóng góp đã bàn giao:** Phương — tích hợp contract, `DaySim`, giao diện và release; Tâm — luật gather, PO và đổi kho ngày; Huyền — QA, regression, fixture và proof; Nga — luật quán/scenario, kiểm tích hợp, soak và điều phối retro. Căn cứ: `TEAM.md`, lịch sử commit và hồ sơ từng thành viên.
+- **AI sai và cách phát hiện:** lần chạy đầu hoàn thành 10 ngày nhưng dùng sai fixture lặp lại. Test so lượng mỗi nguyên liệu với kế hoạch của từng ngày đã bắt lỗi trước khi tạo artifact cuối.
+- **Bài học:** kiểm cả dữ liệu đầu vào chuyển giữa các ngày lặp, không chỉ trạng thái kết thúc và số ngày hoàn thành.
+- **Số liệu AI:** token theo người không được công cụ ghi lại; không suy đoán con số.
