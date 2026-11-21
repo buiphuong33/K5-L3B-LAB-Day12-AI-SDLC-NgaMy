@@ -9,6 +9,7 @@
 ## Phase 2 (nhanh)
 - Điều tốt: `QuanSim` nhận danh sách món theo kế hoạch ngày và dùng menu/tuning hiện hành cho số bếp, bàn, món và nguyên liệu; kiểm scenario mở rộng theo dữ liệu thay vì khóa cứng danh sách P1.
 - Điều tệ: lúc làm lát Nga, repo vẫn có `contract_version: 1.0`; chưa thể chạy scenario `day` theo v1.1 hoặc kiểm smoke cùng `day.py`.
+- Điều rút ra khi tích hợp: `fish.py` và `monsters.py` viết trước khi đọc kỹ ticket nên phải sửa lại lúc ráp vào `gather`.
 - 1 hành động cho Phase 3 (Nga): khi contract v1.1 và `day.py` được gộp, chạy smoke mở quán với kho bàn giao và xác nhận món ngoài kế hoạch không xuất hiện trong lựa chọn khách.
 
 ## Phase 4 (cuối)
