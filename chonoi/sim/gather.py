@@ -13,7 +13,7 @@ Nhóm viết tiếp (đúng thứ tự một bước trong PRD mục 13.8, "Gath
       - Máu về 0 -> ngất (faint, gather_end reason `fainted`, mất toàn bộ giỏ, kho rỗng)
       - sự kiện dive / surface / oxygen_empty / choke / faint
       - giỏ: thứ tự nhặt (LIFO), sức chứa hold_capacity
-  TODO(nhóm, lát 2): hái + bắt cá + cập bến + kho
+  ĐÃ LÀM (lát 2): hái + bắt cá + cập bến + kho — xem `_harvest`, `_catch`
       - hái nút ở mặt nước (gather, hold_full), nút mọc lại (node_regrown đã có phần đếm ngược)
       - bắt đàn cá bằng `catch` (fish_caught, hold_full, hồi chiêu catch_cd_ticks, chỉ khi dưới nước)
       - cập bến xét TRƯỚC hái (đã có); ghi kho đúng một lần do runner lo
@@ -123,11 +123,11 @@ class GatherSim:
             if self._in_dock():
                 self._finish("docked", events)
                 return events
-            # TODO(nhóm, lát 2): chỉ khi ở mặt nước: hái nút `ready` gần nhất trong interact_radius
-            #   (id nhỏ khi bằng nhau): gather / hold_full; đặt regrow_ticks cho nút.
+            if now_surface:
+                self._harvest(events)
         # 4. bắt cá
-        if inp.pressed("catch"):
-            pass  # TODO(nhóm, lát 2): chỉ khi catch_cd_ticks == 0 và dưới nước: fish_caught / hold_full.
+        if inp.pressed("catch") and self.catch_cd_ticks == 0 and not now_surface:
+            self._catch(events)
         # 5. hết giờ
         if self.time_left_ticks <= 0:
             self._finish("time", events)
@@ -143,7 +143,7 @@ class GatherSim:
         before = self.oxygen_ticks
         self.oxygen_ticks = max(0, self.oxygen_ticks - 1)
         if before > 0 and self.oxygen_ticks == 0:
-            events.append(("oxygen_empty", {"pos": list(self.pos)}))
+            events.append(("oxygen_empty", {"oxygen_ticks": 0}))
         if self.oxygen_ticks > 0:
             self.zero_oxy_ticks = 0
             return False
@@ -160,24 +160,48 @@ class GatherSim:
 
     def _faint(self, events):
         """Máu về 0: mất toàn bộ giỏ, kết thúc buổi với kho rỗng."""
-        lost = self.inventory_items()
+        lost = list(reversed(self.hold))  # thứ tự bỏ: nhặt sau bỏ trước
         self.hold = []
-        events.append(("faint", {"pos": list(self.pos), "lost": {"items": lost}}))
+        events.append(("faint", {"cause": "choke", "lost": lost, "hp": 0}))
         self._finish("fainted", events)
 
-    def _hold_full(self) -> bool:
-        return len(self.hold) >= int(self.t["hold_capacity"])
+    # --- lát 2: hái, bắt cá -----------------------------------------------------
+    def _free_slots(self) -> int:
+        return int(self.t["hold_capacity"]) - len(self.hold)
 
-    def _hold_push(self, kind) -> bool:
-        """Thêm một món vào giỏ (cuối mảng = mới nhất, LIFO). Trả False nếu giỏ đầy."""
-        if self._hold_full():
-            return False
-        self.hold.append(kind)
-        return True
+    def _nearest(self, entities, radius):
+        """Thực thể gần nhất trong bán kính (tính cả đúng mép), hòa thì id nhỏ trước."""
+        in_range = [e for e in sort_by_id(entities) if math.dist(self.pos, e["pos"]) <= radius]
+        return min(in_range, key=lambda e: math.dist(self.pos, e["pos"])) if in_range else None
 
-    def _hold_pop(self):
-        """Lấy món mới nhất ra khỏi giỏ (LIFO); giỏ rỗng trả None."""
-        return self.hold.pop() if self.hold else None
+    def _harvest(self, events):
+        node = self._nearest([n for n in self.nodes if n["regrow_ticks"] == 0], self.t["interact_radius"])
+        if node is None:
+            return
+        amount = int(self.t["node_yield"])
+        free = self._free_slots()
+        if free < amount:
+            events.append(("hold_full", {"action": "gather", "node_id": node["id"],
+                                         "required": amount, "free": free}))
+            return
+        self.hold.extend([node["kind"]] * amount)
+        node["regrow_ticks"] = int(round(self.t["regrow_s"] * TICK))
+        events.append(("gather", {"node_id": node["id"], "kind": node["kind"], "amount": amount}))
+
+    def _catch(self, events):
+        fish = self._nearest(self.fish, self.t["catch_radius"])
+        if fish is None:
+            return
+        amount = int(self.t["fish_yield"][fish["kind"]])
+        free = self._free_slots()
+        if free < amount:
+            events.append(("hold_full", {"action": "catch", "fish_id": fish["id"],
+                                         "required": amount, "free": free}))
+            return
+        self.hold.extend([fish["kind"]] * amount)
+        self.fish.remove(fish)
+        self.catch_cd_ticks = int(round(self.t["catch_cooldown_s"] * TICK))
+        events.append(("fish_caught", {"fish_id": fish["id"], "kind": fish["kind"], "yield": amount}))
 
     # --- tiện ích ---------------------------------------------------------------
     def _at_surface(self) -> bool:
