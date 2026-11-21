@@ -7,9 +7,9 @@
 - Hành động: QA đối chiếu AC/event cho reserved/assigned/served/unfulfillable, hết kiên nhẫn và đóng ca.
 
 ## Phase 2 (nhanh)
-- Điều tốt:
-- Điều tệ:
-- 1 hành động cho Phase 3:
+- Điều tốt: `QuanSim` nhận danh sách món theo kế hoạch ngày và dùng menu/tuning hiện hành cho số bếp, bàn, món và nguyên liệu; kiểm scenario mở rộng theo dữ liệu thay vì khóa cứng danh sách P1.
+- Điều tệ: lúc làm lát Nga, repo vẫn có `contract_version: 1.0`; chưa thể chạy scenario `day` theo v1.1 hoặc kiểm smoke cùng `day.py`.
+- 1 hành động cho Phase 3 (Nga): khi contract v1.1 và `day.py` được gộp, chạy smoke mở quán với kho bàn giao và xác nhận món ngoài kế hoạch không xuất hiện trong lựa chọn khách.
 
 ## Phase 4 (cuối)
 - Rà lại hành động Phase 2: đã làm chưa? vì sao?
