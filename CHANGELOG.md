@@ -15,6 +15,8 @@
   {"id":"I2","kind":"bong_sung","fresh":100}]`; object đếm `{"ca_loc":2}` → hai cá thể có id riêng;
   `reserved: {"ca_loc":1}` → `reserved: ["I1"]` (id phải nằm trong `quan.stock`, chưa ươn).
 
+- Bật `contract_version: "1.2"`. JSONL giữ nguyên độ chính xác của `fresh` để so khớp với file kho.
+
 ### Phase 2 (Test Contract v1.1)
 - **Breaking:** `fish_initial` là số đàn (8), vị trí lấy từ điểm sinh theo seed.
 - Thêm cá bơi và sinh cá, Cá Sấu, Máu và ngất do quái, 2 bếp, 4 bàn, 6 món.

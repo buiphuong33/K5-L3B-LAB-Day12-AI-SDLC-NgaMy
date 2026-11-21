@@ -17,6 +17,11 @@
 - Điều tệ: adapter và `DaySim` cá thể đã được gộp, nhưng contract vẫn v1.1, gather còn xuất kho đếm và chưa có test quán P3; chưa xác nhận được tích hợp end-to-end.
 - 1 hành động cho Phase 4 (Nga): sau khi gộp adapter v1.2, đối chiếu snapshot/event của `stock`, reservation và `cook_started.items` với smoke hai tiến trình.
 
+## Phase 3 (nhanh, về lần đổi kho)
+- Điều tốt: giữ contract 1.1 trong lúc chuyển nên `main` không đỏ; ADR 0001 chốt schema trước khi các lát làm song song.
+- Điều tệ: lỗi chỉ lộ khi bật v1.2 trên bản gộp, vì mỗi lát chỉ kiểm riêng.
+- 1 hành động cho Phase 4 (Huyền): chạy smoke trên bản tích hợp ngay khi có hai lát trở lên, không chờ cuối phase.
+
 ## Phase 4 (cuối)
 - Rà lại hành động Phase 2: đã làm chưa? vì sao?
 - Điều tốt / điều tệ:

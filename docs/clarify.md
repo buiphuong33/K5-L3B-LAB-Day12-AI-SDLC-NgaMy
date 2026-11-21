@@ -11,3 +11,4 @@
 | 7 | 2026-11-21 | Khách ăn xong đúng tick đóng ca thì `paid.reason` là gì? | **Giả định:** `finished_eating`; `closing` dành cho khách còn đang ăn. Chưa hỏi Anh Năm. | Nhóm (chờ xác nhận) |
 | 8 | 2026-11-21 | Cá đổi hướng và hướng ban đầu theo phân phối nào? | **Giả định:** đều trong [0°, 360°) theo seed. Chưa hỏi Anh Năm. | Nhóm (chờ xác nhận) |
 | 9 | 2026-11-21 | 8 đàn đầu ca chọn loài và điểm thế nào? | **Giả định:** dùng cùng trọng số và điều kiện cách > 1 m như sinh theo lịch. Chưa hỏi Anh Năm. | Nhóm (chờ xác nhận) |
+| 10 | 2026-11-21 | JSONL có làm tròn `fresh` 3 chữ số như tọa độ không? | **Giả định:** không, vì mục smoke của TICKET-03 yêu cầu so chính xác độ tươi giữa snapshot quán và file. Chưa hỏi Anh Năm. | Nhóm (chờ xác nhận) |
