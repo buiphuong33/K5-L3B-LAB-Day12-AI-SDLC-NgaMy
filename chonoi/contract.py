@@ -27,7 +27,25 @@ def load_contract(path=DEFAULT_PATH) -> dict:
     except (OSError, ValueError) as e:
         raise BadInput(f"không đọc được {path}: {e}")
     validate_tuning(c.get("tuning"))
+    _validate_freshness(c)
     return c
+
+
+def _validate_freshness(c):
+    """v1.2: khối freshness bắt buộc; ngưỡng/hao phải hữu hạn, dương, trong [0, 100]."""
+    f = c["tuning"].get("freshness")
+    v12 = str(c.get("contract_version")) >= "1.2"
+    if f is None:
+        if v12:
+            raise BadInput("contract v1.2 cần tuning.freshness")
+        return
+    if not isinstance(f, dict) or set(f) != {"initial", "gather_decay_per_s", "quan_decay_per_s", "spoiled_below"}:
+        raise BadInput("tuning.freshness cần đúng {initial, gather_decay_per_s, quan_decay_per_s, spoiled_below}")
+    _between("freshness.initial", f["initial"], 0, 100)
+    _between("freshness.spoiled_below", f["spoiled_below"], 0, 100)
+    for k in ("gather_decay_per_s", "quan_decay_per_s"):
+        if not _num(f[k]) or f[k] <= 0:
+            raise BadInput(f"tuning.freshness.{k} phải > 0")
 
 
 def _int_between(name, v, lo, hi):
