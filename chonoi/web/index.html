@@ -84,6 +84,9 @@ poll();
 // ---------- vẽ ----------
 const KIND_COLOR = { ca_loc: "#7c9a52", ca_linh: "#d6e6f2", ca_keo: "#d9a066", bong_dien_dien: "#f2c230", bong_sung: "#e8799c", keo_neo: "#8fcf6b" };
 const KIND_NAME = { ca_loc: "cá lóc", ca_linh: "cá linh", ca_keo: "cá kèo", bong_dien_dien: "điên điển", bong_sung: "bông súng", keo_neo: "kèo nèo" };
+const DISH_NAME = { ca_loc_nuong_trui: "Cá lóc nướng trui", goi_bong_sung: "Gỏi bông súng", lau_ca_linh_dien_dien: "Lẩu cá linh điên điển" };
+const STOVE_STATE = { idle: "rảnh", cooking: "đang nấu", ready: "món chín" };
+const dname = (d) => DISH_NAME[d] || d;
 const kc = (k) => KIND_COLOR[k] || "#bbbbbb";
 
 function fit() {
@@ -258,8 +261,17 @@ function drawQuan(w, h) {
   // HUD
   text("⏱ " + fmtTime(snap.time_left_ticks), 14, 28, { size: 20 });
   text(`Tiền ${snap.money ?? 0}k · uy tín ${(snap.reputation ?? 0).toFixed(1)} · điểm ${snap.score ?? 0}`, 110, 28, { size: 16 });
-  const stock = snap.stock ? Object.keys(snap.stock).map((k) => (KIND_NAME[k] || k) + "×" + snap.stock[k]).join(", ") : "";
-  text("Kho: " + (stock || "(trống)"), 14, 52, { size: 13, color: "#cfd8dc" });
+  // Kho khả dụng = tồn vật lý − phần khách đang giữ chỗ
+  const avail = Object.assign({}, snap.stock || {});
+  (snap.customers || []).forEach((c) => Object.entries(c.reserved || {}).forEach(([k, n]) => (avail[k] = (avail[k] || 0) - n)));
+  const stock = Object.keys(avail).sort().map((k) => (KIND_NAME[k] || k) + " " + avail[k] + "/" + (snap.stock[k] || 0)).join(", ");
+  text("Kho khả dụng/tồn: " + (stock || "(trống)"), 14, 52, { size: 13, color: "#cfd8dc" });
+  // Bảng trạng thái góc phải: bếp, tay, món gọi + kiên nhẫn
+  const lines = [];
+  (snap.stoves || []).forEach((st) => lines.push(`Bếp ${st.id}: ${STOVE_STATE[st.state] || st.state}` + (st.dish ? ` · ${dname(st.dish.dish_id || st.dish)}` : "") + (st.state === "cooking" && st.cook_ticks_left !== undefined ? ` (${Math.ceil(st.cook_ticks_left / 60)}s)` : "")));
+  lines.push("Trên tay: " + (snap.hand ? dname(snap.hand.dish_id || snap.hand) : "(trống)"));
+  (snap.customers || []).forEach((c) => lines.push(`${c.table_id}: ${dname(c.dish_id)} · ${c.state === "eating" ? "đang ăn" : "chờ " + Math.ceil((c.patience_ticks_left || 0) / 60) + "s"}`));
+  lines.forEach((l, i) => text(l, w - 10, 24 + i * 18, { size: 13, align: "right", color: "#ffe9a8" }));
   text("WASD/mũi tên đi · E tương tác (bếp / bàn) · R chơi lại", w - 10, h - 14, { size: 12, align: "right", color: "#9fb3c0" });
 }
 
