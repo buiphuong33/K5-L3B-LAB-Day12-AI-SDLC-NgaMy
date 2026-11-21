@@ -1,8 +1,9 @@
 """Phase 3 — độ tươi buổi sáng (gather) theo TICKET-03 mục 1. Chủ lát: Tâm.
 
 Hai lớp test:
-  - `GatherFreshUnit`: gọi thẳng `Session` với tuning của contract + khối `freshness` theo ticket,
-    chạy được cả khi contract trên `main` còn 1.1 (gather bật luật v1.2 khi có `freshness`).
+  - `GatherFreshUnit`: gọi thẳng `Session` với tuning của contract + `contract_version` "1.2" +
+    khối `freshness` theo ticket, chạy được cả khi contract trên `main` còn 1.1 (gather bật kho cá thể
+    theo `tuning["contract_version"]`, ADR 0001 mục 5).
   - `GatherFreshHeadless`: hộp đen qua `headless_cmd` với fixture của ticket; tự bỏ qua tới khi
     `game.contract.json` có `contract_version` "1.2".
 """
@@ -24,6 +25,7 @@ with open(os.path.join(ROOT, "game.contract.json"), encoding="utf-8") as f:
 TICKET_FRESHNESS = {"initial": 100, "gather_decay_per_s": 0.5, "quan_decay_per_s": 0.25, "spoiled_below": 30}
 TUNING = copy.deepcopy(CONTRACT["tuning"])
 TUNING.setdefault("freshness", TICKET_FRESHNESS)
+TUNING["contract_version"] = "1.2"  # gather đọc version từ tuning để bật kho cá thể
 FRESH = TUNING["freshness"]
 TICK_HZ = TUNING.get("tick_hz", 60)
 STEP = FRESH["gather_decay_per_s"] / TICK_HZ  # điểm tươi mất mỗi tick ở giỏ
@@ -61,12 +63,14 @@ class GatherFreshUnit(unittest.TestCase):
         self.assertEqual([e["id"] for e in sim.hold], ["I1"])
 
     def test_not_spoiled_while_at_or_above_threshold(self):
-        # 30 + 1 bước hao: sau 1 bước đúng 30.0, chưa ươn; bước kế mới ươn.
-        sim, evs = run({**QUIET, "hold": [item("I1", "ca_loc", 30 + STEP)]}, 1)
+        # 30.5 biểu diễn chính xác: sau đúng 0.5 / STEP bước (60 tick) còn đúng 30.0 -> chưa ươn;
+        # bước kế mới ươn. (Dùng số không biểu diễn chính xác như 30 + 0.5/60 sẽ lệch ngưỡng.)
+        n = round(0.5 / STEP)
+        sim, evs = run({**QUIET, "hold": [item("I1", "ca_loc", 30.5)]}, n)
         self.assertEqual(evs, [])
-        self.assertEqual(sim.hold[0]["fresh"], 30.0)
-        _, evs = run({**QUIET, "hold": [item("I1", "ca_loc", 30 + STEP)]}, 2)
-        self.assertEqual(named(evs, "spoiled"), [(2, {"item_id": "I1", "kind": "ca_loc", "location": "hold"})])
+        self.assertEqual(sim.hold[0]["fresh"], 30)
+        _, evs = run({**QUIET, "hold": [item("I1", "ca_loc", 30.5)]}, n + 1)
+        self.assertEqual(named(evs, "spoiled"), [(n + 1, {"item_id": "I1", "kind": "ca_loc", "location": "hold"})])
 
     def test_many_spoil_same_tick_in_id_order(self):
         hold = [item("I10", "ca_loc", 30), item("I2", "ca_linh", 30)]
