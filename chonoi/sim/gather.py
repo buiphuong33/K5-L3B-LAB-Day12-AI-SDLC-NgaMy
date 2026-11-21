@@ -7,7 +7,7 @@ Mặt cắt dòng sông nhìn NGANG: vị trí `[x, d]` (x sang phải, `d` đ�
 cập bến (`interact` trong vùng bến -> `gather_end` reason `docked`), xuất kho, snapshot đầy đủ trường gather.
 
 Nhóm viết tiếp (đúng thứ tự một bước trong PRD mục 13.8, "Gather"):
-  TODO(nhóm, lát 1): bơi + oxy + biên + giỏ
+  ĐÃ LÀM (lát 1, Tâm): bơi + oxy + biên + giỏ — xem `_update_oxygen`, `_faint`, `_hold_push/_hold_pop`
       - oxy: dưới nước (d > surface_depth) trừ 1 tick/tick, mặt nước hồi oxygen_refill_per_tick, kẹp [0, max]
       - ngạt: oxy = 0 và đang dưới nước -> đếm zero_oxy_ticks, đủ choke_interval_ticks thì -1 Máu (choke)
       - Máu về 0 -> ngất (faint, gather_end reason `fainted`, mất toàn bộ giỏ, kho rỗng)
@@ -107,11 +107,17 @@ class GatherSim:
                 n["regrow_ticks"] -= 1
                 if n["regrow_ticks"] == 0:
                     events.append(("node_regrown", {"node_id": n["id"]}))
-        # 2. bơi + chặn mép
+        # 2. bơi + chặn mép; so phân vùng đầu/cuối bước -> dive / surface
+        was_surface = self._at_surface()
         self._move(inp)
-        # TODO(nhóm, lát 1): so phân vùng đầu/cuối bước -> dive / surface (data: pos).
-        # TODO(nhóm, lát 1): oxy theo d CUỐI bước (mặt nước hồi, dưới nước trừ), oxygen_empty khi từ dương
-        #   xuống 0, đếm ngạt, choke (-1 Máu). Máu 0 -> faint + gather_end("fainted") với giỏ rỗng, return.
+        now_surface = self._at_surface()
+        if was_surface and not now_surface:
+            events.append(("dive", {"pos": list(self.pos)}))
+        elif now_surface and not was_surface:
+            events.append(("surface", {"pos": list(self.pos)}))
+        # 2b. oxy theo d CUỐI bước, ngạt, Máu, ngất
+        if self._update_oxygen(now_surface, events):
+            return events
         # 3. interact: bến trước, rồi hái
         if inp.pressed("interact"):
             if self._in_dock():
@@ -126,6 +132,52 @@ class GatherSim:
         if self.time_left_ticks <= 0:
             self._finish("time", events)
         return events
+
+    # --- lát 1: oxy, ngạt, Máu, giỏ ---------------------------------------------
+    def _update_oxygen(self, at_surface, events) -> bool:
+        """Cập nhật oxy / ngạt / Máu sau khi bơi. Trả True nếu vừa ngất (buổi đã kết thúc)."""
+        if at_surface:
+            self.oxygen_ticks = min(self.oxygen_max, self.oxygen_ticks + int(self.t["oxygen_refill_per_tick"]))
+            self.zero_oxy_ticks = 0
+            return False
+        before = self.oxygen_ticks
+        self.oxygen_ticks = max(0, self.oxygen_ticks - 1)
+        if before > 0 and self.oxygen_ticks == 0:
+            events.append(("oxygen_empty", {"pos": list(self.pos)}))
+        if self.oxygen_ticks > 0:
+            self.zero_oxy_ticks = 0
+            return False
+        self.zero_oxy_ticks += 1
+        if self.zero_oxy_ticks < int(self.t["choke_interval_ticks"]):
+            return False
+        self.zero_oxy_ticks = 0
+        self.hp = max(0, self.hp - 1)
+        events.append(("choke", {"hp": self.hp}))
+        if self.hp > 0:
+            return False
+        self._faint(events)
+        return True
+
+    def _faint(self, events):
+        """Máu về 0: mất toàn bộ giỏ, kết thúc buổi với kho rỗng."""
+        lost = self.inventory_items()
+        self.hold = []
+        events.append(("faint", {"pos": list(self.pos), "lost": {"items": lost}}))
+        self._finish("fainted", events)
+
+    def _hold_full(self) -> bool:
+        return len(self.hold) >= int(self.t["hold_capacity"])
+
+    def _hold_push(self, kind) -> bool:
+        """Thêm một món vào giỏ (cuối mảng = mới nhất, LIFO). Trả False nếu giỏ đầy."""
+        if self._hold_full():
+            return False
+        self.hold.append(kind)
+        return True
+
+    def _hold_pop(self):
+        """Lấy món mới nhất ra khỏi giỏ (LIFO); giỏ rỗng trả None."""
+        return self.hold.pop() if self.hold else None
 
     # --- tiện ích ---------------------------------------------------------------
     def _at_surface(self) -> bool:
