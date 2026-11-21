@@ -58,13 +58,10 @@ class QuanSim:
         for customer in sorted(missing_reservations,
                                key=lambda c: (c["order_tick"], id_key(c["table_id"]))):
             recipe = self.menu[customer["dish_id"]]["recipe"]
-            if all(self._available(kind) >= amount for kind, amount in recipe.items()):
-                customer["reserved"] = dict(recipe)
-                self._add_reservation(recipe)
-            else:
-                customer["order_status"] = "unfulfillable"
-                customer.pop("dish_id", None)
-                customer["reserved"] = {}
+            if not all(self._available(kind) >= amount for kind, amount in recipe.items()):
+                raise BadInput(f"khách {customer['id']}: giữ chỗ {customer['dish_id']} vượt kho")
+            customer["reserved"] = dict(recipe)
+            self._add_reservation(recipe)
         for kind, amount in self._reserved.items():
             if amount > self.stock.get(kind, 0):
                 raise BadInput(f"customers giữ chỗ {kind} vượt kho")
@@ -94,7 +91,7 @@ class QuanSim:
     def snapshot(self) -> dict:
         occupied = {customer["table_id"]: customer["id"] for customer in self.customers}
         return {
-            "player": {"pos": self.pos},
+            "player": {"pos": self.pos, "vel": self.vel},
             "stock": {kind: self.stock[kind] for kind in sorted(self.stock) if self.stock[kind] > 0},
             "hand": self.hand,
             "stoves": [{key: stove.get(key) for key in
@@ -201,7 +198,7 @@ class QuanSim:
                 events.append(("dish_picked", {"stove_id": stove["id"], "order_id": dish["order_id"],
                                                "dish_id": dish["dish_id"]}))
             return
-        if stove["state"] != "idle" or self.hand is not None:
+        if stove["state"] != "idle":
             return
         orders = sorted((customer for customer in self.customers
                          if customer["order_status"] == "reserved"),
@@ -259,7 +256,7 @@ class QuanSim:
             if customer is None:
                 continue
             if customer["state"] == "eating" and (closing or customer["eat_ticks_left"] == 0):
-                self._pay(customer, "closing" if closing else "finished_eating", events)
+                self._pay(customer, "finished_eating" if customer["eat_ticks_left"] == 0 else "closing", events)
             elif customer["state"] == "waiting" and closing:
                 self._remove_customer(customer)
                 events.append(("customer_left", {"order_id": customer["id"], "table_id": table["id"],
@@ -302,8 +299,9 @@ class QuanSim:
         customer["reserved"] = {}
 
     def _change_reputation(self, delta):
+        # làm tròn để cộng dồn số thực không làm floor(uy tín) hụt một bậc (1.9999... thay vì 2)
         self.reputation = min(self.t["reputation_max"],
-                              max(self.t["reputation_min"], self.reputation + delta))
+                              max(self.t["reputation_min"], round(self.reputation + delta, 9)))
 
     def _distance(self, position):
         return math.hypot(self.pos[0] - position[0], self.pos[1] - position[1])
