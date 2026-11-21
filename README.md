@@ -1,67 +1,118 @@
-# Day 12 — AI SDLC: Quán Ăn Chợ Nổi
+# Quán Ăn Chợ Nổi — nhóm NgaMy (v1.0.0)
 
-> **Làm theo nhóm 4–6 người** · Dùng AI để xây game 2D qua **4 phase** trong **3 giờ**: Út Sen lặn bắt cá, hái rau trên mặt nước rồi tối mở quán phục vụ khách.
-> **Yêu cầu từng phase mở đúng mốc giờ tại lab board:** **[Chợ Nổi Lab](https://claude.ai/artifact/E35v787wSx2wDgPTNhMVDg)** (cần đăng nhập claude.ai; có trợ giảng AI cho từng phase).
+Game 2D chơi trên trình duyệt: buổi sáng Út Sen **lặn bắt cá, hái rau** trên sông (oxy, Máu, Cá Sấu, độ tươi),
+buổi tối **mở quán** nấu và phục vụ khách, cuối Ngày ghé **Shop** mua nâng cấp. Một lượt chuẩn gồm 5 Ngày.
+Sản phẩm của Lab Day 12 — AI SDLC (4 phase, Test Contract v1.3). Thành viên và phân công: [`TEAM.md`](TEAM.md).
 
-## Bắt buộc (chỉ có thế)
+## Chạy nhanh
 
-Cách làm việc kỹ thuật là **tự do** (push thẳng, nhánh + PR, pair, có hay không CI…). Cái bắt buộc:
-
-1. **Một repo chung:** trưởng nhóm **fork** repo này, đặt tên `K5-L3B-LAB-Day12-AI-SDLC-<ten-nhom>`, thêm mọi thành viên làm collaborator (*Settings → Collaborators*, quyền Write) và để repo **public** (giảng viên xem được, không cần mời).
-2. **Cả nhóm cùng commit** bằng tài khoản GitHub của mình, mỗi người **≥ 3 commit có nội dung** (làm cặp thì ghi `Co-authored-by:`).
-3. **Điền [`TEAM.md`](TEAM.md):** danh sách thành viên + thỏa thuận làm việc nhóm; sửa `team_size` trong [`game.contract.json`](game.contract.json). Commit của người không có trong `TEAM.md` không được tính.
-4. **Gắn tag** `phase-1` … `phase-4` đúng hạn; chạy được tại từng tag.
-5. **Ghi chép tối thiểu:** `docs/verification/phase-n.md`, `docs/clarify.md`, `docs/ai-usage-log.md`, `docs/retro.md`, `docs/members/<handle>.md`.
-
-## Bắt đầu nhanh
+Từ clone sạch trên macOS hoặc Linux, **3 lệnh**:
 
 ```bash
-git clone <fork-của-nhóm> && cd <fork-của-nhóm>
-PYTHONPATH=tests:. python3 -m unittest discover -s tests -v        # smoke test
-python3 -m chonoi.live --mode gather                                # chơi thử trên trình duyệt (tùy chọn)
+git clone https://github.com/buiphuong33/K5-L3B-LAB-Day12-AI-SDLC-NgaMy.git
+cd K5-L3B-LAB-Day12-AI-SDLC-NgaMy
+python3 -m chonoi.live --mode day
 ```
 
-Game cần chế độ **headless** theo Test Contract (`python3 -m chonoi.headless --mode gather|quan …`) để được chạy và chấm tự động. **Công nghệ không ràng buộc**: khung Python trong `chonoi/` chỉ là gợi ý, chi tiết ở [`docs/STARTER.md`](docs/STARTER.md).
+Lệnh cuối in địa chỉ (mặc định `http://127.0.0.1:8000/`); mở địa chỉ đó bằng trình duyệt để chơi.
+Không cần cài thêm gói nào. Bản đóng gói đính kèm GitHub Release `v1.0.0` chạy giống hệt: giải nén,
+`cd` vào thư mục rồi chạy lệnh thứ 3.
 
-## Cách chơi và tính điểm
+Tùy chọn của `chonoi.live`: `--mode gather|quan|day`, `--days 1..5`, `--seed N`, `--port N` (0 = cổng ngẫu nhiên).
+Chơi riêng hai buổi: `python3 -m chonoi.live --mode gather --inventory-out kho.json` (cập bến để ghi kho),
+rồi `python3 -m chonoi.live --mode quan --inventory kho.json`.
 
-- **Điều khiển:** WASD hoặc mũi tên để bơi/đi, **E** để hái, cập bến, nấu, bưng, phục vụ, **Space** để bắt cá khi lặn, **R** để chơi lại.
-- **Nối hai buổi:** `python3 -m chonoi.live --mode gather --inventory-out kho.json`, cập bến, rồi `python3 -m chonoi.live --mode quan --inventory kho.json`.
-- **Điểm:** `earned + 100 × floor(uy tín)`, với `earned` là tổng tiền thu trong lượt (nghìn đồng).
-- **Test (1 lệnh):** `PYTHONPATH=tests:. python3 -m unittest discover -s tests -v`.
+## Yêu cầu môi trường
+
+- **Python 3.10 trở lên**, chỉ dùng thư viện chuẩn (không `pip install`). Lệnh trong README dùng `python3`.
+- **Trình duyệt** hiện đại (Chrome, Firefox, Safari, Edge) để chơi bản có giao diện.
+- **git** để clone và để chạy script đóng gói.
+- Đã thử trên Windows 11 (Python 3.13): dùng `python` thay `python3` nếu máy không có lệnh `python3`, và
+  `PYTHONPATH=tests;.` thay cho `tests:.` khi chạy test.
+
+## Điều khiển
+
+| Phím | Tác dụng |
+|---|---|
+| WASD / mũi tên | Bơi (buổi sáng) / đi lại (quán) |
+| E | Hái ở mặt nước, cập bến khi ở vùng bến; ở quán: nấu, lấy món, phục vụ |
+| Space | Bắt cá khi đang lặn |
+| Esc / P | Tạm dừng; khi tạm dừng, M về menu |
+| Enter | Mode day: bắt đầu / qua màn; trong Shop: đóng Shop |
+| 1 / 2 | Trong Shop: mua Bình oxy / Áo phao |
+| R | Chơi lại |
+
+**Điểm:** `earned + 100 × floor(uy tín)`, với `earned` là tổng tiền thu trong lượt (nghìn đồng).
+Nguyên liệu hao độ tươi (giỏ 0.5/s, kho quán 0.25/s); dưới 30 là ươn, không dùng nấu được; giá món
+tính theo độ tươi trung bình của nguyên liệu.
+
+## Chạy test
+
+```bash
+PYTHONPATH=tests:. python3 -m unittest discover -s tests -v
+```
+
+Gồm smoke test hộp đen của Test Contract, regression P1–P3 và test từng lát P4 (`tests/test_p4_*.py`).
+
+## Headless
+
+Chế độ không giao diện theo Test Contract (dùng để chấm tự động, ghi JSONL tất định: cùng seed → giống từng byte):
+
+```bash
+python3 -m chonoi.headless --mode gather --seed 1 --ticks 600 --out out.jsonl
+python3 -m chonoi.headless --mode gather --seed 1 --ticks 12000 --out g.jsonl --inventory-out kho.json
+python3 -m chonoi.headless --mode quan --seed 1 --ticks 600 --inventory kho.json --out q.jsonl
+python3 -m chonoi.headless --mode day --days 5 --seed 1 --ticks 200000 --out day.jsonl
+```
+
+Tham số khác: `--scenario <file.json>`, `--inputs <file.json>`, `--snapshot-every N`. Đầu vào sai trả mã 2.
+Lệnh chuẩn khai trong [`game.contract.json`](game.contract.json) (`headless_cmd`, `run_cmd`).
+
+## Benchmark
+
+Lệnh khai ở `bench_cmd` trong `game.contract.json` (cảnh buổi sáng mặc định, seed 42, cửa sổ 1280×720,
+làm nóng 3 s rồi đo 30 s):
+
+```bash
+python3 -m chonoi.bench --seed 42 --duration 30 --out bench.json
+```
+
+`bench.json` có `avg_fps`, `p1_low_fps`, `frames`, `measured_s`, `load_ms`. Kết quả đo trên commit phát hành:
+[`docs/proof/phase-4/`](docs/proof/phase-4/).
+
+**Soak** (10 Ngày headless bằng bot tất định), lệnh khai ở `soak_cmd`:
+
+```bash
+python3 -m chonoi.soak --seed 7 --days 10 --out soak.json
+```
+
+`soak.json` có `days`, `days_completed`, `crashes`, `results`, `duration_s`.
+
+## Đóng gói bản phát hành
+
+```bash
+python3 tools/package_release.py --ref phase-4 --check
+```
+
+Tạo `dist/quan-an-cho-noi-v1.0.0.zip` (+ `.sha256`) bằng `git archive` từ đúng commit `--ref`, rồi giải nén
+vào thư mục tạm và chạy thử headless từ bản đó. File zip này đính kèm GitHub Release `v1.0.0`.
 
 ## Sáng tạo của nhóm
 
-Phase 1 chưa thêm phần sáng tạo, nhóm ưu tiên làm đúng lõi.
+Nhóm 4 người, ưu tiên làm đúng lõi; không làm mục mở rộng (bảng xếp hạng, phụ đề SFX, dòng nước lũ,
+khách đặt trước). Phần tự thêm trên giao diện (HUD độ tươi, màn chuyển Ngày) không đổi kết quả headless.
 
-## Tự do sáng tạo
+## Tài liệu của nhóm
 
-Ngoài phần đề yêu cầu, nhóm được **thêm** nhân vật, loài cá/cây, sinh vật, món, bản đồ, cơ chế, câu chuyện, đồ họa, âm nhạc… với ba điều kiện: **không phá phần cố định** (tắt ở headless), ghi mục **"Sáng tạo của nhóm"** trong README của nhóm, và **làm lõi đúng trước**.
+- Quy ước cho agent AI: [`AGENTS.md`](AGENTS.md) · skill nhóm: [`tools/skills/`](tools/skills/)
+- Hợp đồng tích hợp: [`docs/contracts/`](docs/contracts/) · quyết định: [`docs/adr/`](docs/adr/)
+- Kiểm chứng: [`docs/verification/`](docs/verification/), [`docs/proof/`](docs/proof/)
+- Làm rõ yêu cầu: [`docs/clarify.md`](docs/clarify.md) · nhật ký AI: [`docs/ai-usage-log.md`](docs/ai-usage-log.md)
+- Standup, retro, phản tư: [`docs/standup.md`](docs/standup.md), [`docs/retro.md`](docs/retro.md), [`docs/members/`](docs/members/)
+- Thay đổi theo phase: [`CHANGELOG.md`](CHANGELOG.md) · giấy phép: [`LICENSE`](LICENSE) · nguồn: [`CREDITS.md`](CREDITS.md)
 
-## Lịch 3 giờ
+## Về lab
 
-| Mốc | Phase | Hạn tag |
-|---|---|---|
-| 0:00 | Phase 1 (PRD-0) | `phase-1` trước 1:00 |
-| 1:00 | Phase 2 | `phase-2` trước 1:55 |
-| 1:55 | Phase 3 | `phase-3` trước 2:30 |
-| 2:30 | Phase 4 | `phase-4` + Release `v1.0.0` trước 3:00 |
-
-Hết giờ mỗi phase thì gắn tag rồi đi tiếp; chỗ chưa xong ghi trung thực trong bằng chứng.
-
-## Đánh giá (100 điểm)
-
-| Hạng mục | Điểm |
-|---|---|
-| Test tự động ẩn (headless, gồm kiểm tra lại phase trước) | 25 |
-| Làm việc nhóm (một repo chung, chia việc, tích hợp, đổi yêu cầu) | 25 |
-| Kiểm chứng & bằng chứng | 15 |
-| Harness AI (AGENTS.md, skill, nhật ký dùng AI) | 10 |
-| Đánh giá & retro | 10 |
-| Chất lượng sản phẩm (đúng yêu cầu, mở rộng/sáng tạo) | 10 |
-| Demo | 5 |
-
-## Quy định
-
-- Dùng AI thoải mái; **không sao chép repo của nhóm khác**; bằng chứng phải thật.
-- Nhân vật, bối cảnh là bản gốc của lab; asset ngoài chỉ dùng CC0/CC-BY/MIT hoặc tự tạo, ghi nguồn trong `CREDITS.md`. Không commit API key, token, `.env`.
+Đề và khung starter: [VinUni-AI20k/K5-L3B-LAB-Day12-AI-SDLC](https://github.com/VinUni-AI20k/K5-L3B-LAB-Day12-AI-SDLC)
+(chi tiết khung: [`docs/STARTER.md`](docs/STARTER.md)). Yêu cầu từng phase trên lab board
+[Chợ Nổi Lab](https://claude.ai/artifact/E35v787wSx2wDgPTNhMVDg).
