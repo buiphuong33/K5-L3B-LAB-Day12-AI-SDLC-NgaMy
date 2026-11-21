@@ -1,11 +1,11 @@
 # TEAM
 
-**Tên nhóm:** …  **Số người:** 4  (khớp `team_size` trong `game.contract.json`)
+**Tên nhóm:** NgaMy  **Số người:** 4  (khớp `team_size` trong `game.contract.json`)
 
 | Thành viên | GitHub handle | Module chính | Vai quy trình | Người dự phòng cho |
 |---|---|---|---|---|
-| Phương (trưởng nhóm) | … | `client/ui` | Integrator, Release | Huyền |
-| Tâm | … | `sim/gather` | PO | Nga |
+| Phương (trưởng nhóm) | buiphuong33 | `client/ui` | Integrator, Release | Huyền |
+| Tâm | minhtama11qc-hash | `sim/gather` | PO | Nga |
 | Nga | Ngahoang2005 | `sim/quan` | Scrum | Tâm |
 | Dương Thị Huyền - 2A202604077 | duongthuyen | `qa` | QA lead | Phương |
 
