@@ -7,7 +7,7 @@
 | Phương (trưởng nhóm) | … | `client/ui` | Integrator, Release | Huyền |
 | Tâm | … | `sim/gather` | PO | Nga |
 | Nga | Ngahoang2005 | `sim/quan` | Scrum | Tâm |
-| Huyền | … | `qa` | QA lead | Phương |
+| Dương Thị Huyền - 2A202604077 | … | `qa` | QA lead | Phương |
 
 **Vai quy trình:** PO (đầu mối hỏi giảng viên, giữ `docs/clarify.md`) · Integrator (giữ `docs/contracts/`, gắn tag) · QA lead · Scrum/Release. Có thể kiêm.
 
