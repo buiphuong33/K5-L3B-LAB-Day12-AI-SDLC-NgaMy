@@ -1,131 +1,104 @@
-"""Đàn cá buổi sáng (`gather`, Phase 2). CHỦ FILE: Tâm.
+"""Đàn cá buổi sáng theo TICKET-02 mục 1.1. Chủ file: Tâm.
 
-KHUNG — dựng trước khi có TICKET-02 / contract v1.1. Chỗ cần đặc tả ghi `TODO(ticket)`.
-
-Cùng kiểu với `monsters.py`: module nhận cấu hình ĐÃ CHUẨN HÓA (`settings`) thay vì đọc thẳng
-`game.contract.json`. Bên tích hợp (`gather.py`) ánh xạ tuning v1.1 vào `settings`; đổi tên khóa
-contract chỉ sửa một chỗ đó. Contract chưa có phần cá thì gather KHÔNG dựng FishSchool (cá đứng yên
-như Phase 1).
-
-Giao diện đã chốt trong TEAM.md ("fish.py → gather.py"):
-  - nhận `Streams` (RNG tách luồng) và `IdAllocator` (cấp id cá mới);
-  - `step(phase_tick, events)`: đổi hướng theo seed, bơi, phản xạ mép, sinh cá theo `phase_tick`;
-  - `fish` là danh sách dict {id, kind, pos, heading_deg}, cùng dạng gather đang dùng.
-
-Quy tắc vàng: không hard-code số; ngẫu nhiên chỉ qua `Streams`; duyệt cá theo `sort_by_id`.
+Số liệu đọc từ tuning `gather`; ngẫu nhiên chỉ qua `Streams`, duyệt cá theo `sort_by_id`.
+Khi `moving=False` (scenario `random_fish:false`) cá đứng yên và không sinh thêm.
 """
 
 import math
 
 from ..ids import sort_by_id
 
-# Luồng RNG riêng cho cá: thêm luồng khác (quái...) không làm lệch chuỗi của cá.
 RNG_TURN = "fish_turn"
 RNG_SPAWN = "fish_spawn"
+TICK = 60.0
 
 
 class FishSchool:
-    """Quản lý các đàn cá của một buổi sáng."""
-
-    REQUIRED_SETTINGS = {
-        "tick_hz",               # tick mỗi giây
-        "speed",                 # đơn vị/giây; số hoặc {kind: số}
-        "turn_interval_ticks",   # bao nhiêu tick đổi hướng một lần
-        "turn_max_deg",          # biên độ đổi hướng tối đa mỗi lần (±)
-        "spawn_interval_ticks",  # TEAM.md: 360
-        "cap",                   # TEAM.md: trần 12 đàn
-        "spawn_kinds",           # loài được sinh (có cá kèo)
-        "min_depth",             # mép trên vùng cá bơi (cá luôn dưới mặt nước)
-    }
-
-    def __init__(self, fish, settings, bounds, streams, ids):
-        missing = self.REQUIRED_SETTINGS - set(settings)
-        if missing:
-            raise ValueError(f"thiếu tuning fish: {sorted(missing)}")
-        if not settings["spawn_kinds"]:
-            raise ValueError("fish spawn_kinds rỗng")
-        self.settings = dict(settings)
-        self.bounds = bounds
+    def __init__(self, tuning, streams, ids, fish=None, moving=True):
+        self.t = tuning
         self.rng = streams
         self.ids = ids
-        self.fish = [{"id": f["id"], "kind": f["kind"], "pos": [float(c) for c in f["pos"]],
-                      "heading_deg": float(f.get("heading_deg", 0))} for f in fish]
-        for f in self.fish:
-            ids.reserve(f["id"])
+        self.moving = moving
+        self.fish = []
+        if fish is not None:
+            self.fish = [{"id": f["id"], "kind": f["kind"], "pos": [float(c) for c in f["pos"]],
+                          "heading_deg": float(f.get("heading_deg", 0)),
+                          "age_ticks": f.get("age_ticks", 0)} for f in fish]
+            for f in self.fish:
+                ids.reserve(f["id"])
+        elif moving:
+            for _ in range(int(tuning["fish_initial"])):
+                self._spawn_one()
 
     # --- giao diện cho gather ---------------------------------------------------
     def snapshot(self):
-        return [{key: f[key] for key in ("id", "kind", "pos", "heading_deg")}
+        return [{key: f[key] for key in ("id", "pos", "kind", "heading_deg", "age_ticks")}
                 for f in sort_by_id(self.fish)]
 
-    def remove(self, fish_id):
-        self.fish = [f for f in self.fish if f["id"] != fish_id]
+    def remove(self, fish):
+        self.fish.remove(fish)
 
     def step(self, phase_tick, events):
-        """Gọi MỘT lần mỗi bước gather, đúng chỗ mục 4.5 quy định (TODO(ticket))."""
+        """Gọi sau khi xét hết giờ: cá bơi rồi sinh thêm; cá mới tham gia từ bước sau."""
+        if not self.moving:
+            return
         for f in sort_by_id(self.fish):
-            self._turn(f, phase_tick)
+            f["age_ticks"] += 1
+            if f["age_ticks"] % int(self.t["fish_turn_ticks"]) == 0:
+                f["heading_deg"] = self.rng.get(RNG_TURN).uniform(0.0, 360.0)
             self._swim(f)
-        self._spawn(phase_tick, events)
+        if phase_tick % int(self.t["fish_spawn_ticks"]) == 0 and len(self.fish) < int(self.t["fish_max"]):
+            f = self._spawn_one()
+            if f is not None:
+                events.append(("fish_spawned", {"id": f["id"], "kind": f["kind"], "pos": list(f["pos"])}))
 
     # --- chi tiết ----------------------------------------------------------------
-    def _speed(self, kind):
-        s = self.settings["speed"]
-        return float(s.get(kind, 0.0) if isinstance(s, dict) else s)
-
-    def _area(self):
-        """Vùng cá bơi: (x_lo, x_hi), (d_lo, d_hi)."""
-        return ((float(self.bounds["x"][0]), float(self.bounds["x"][1])),
-                (float(self.settings["min_depth"]), float(self.bounds["d"][1])))
-
-    def _turn(self, f, phase_tick):
-        every = int(self.settings["turn_interval_ticks"])
-        if every <= 0 or phase_tick % every != 0:
-            return
-        # TODO(ticket): phân phối đổi hướng (đều trong ±span? chọn từ tập hướng?) và có rút số
-        #   cho mọi đàn mỗi lần hay không — ảnh hưởng tất định, phải đúng đặc tả.
-        span = float(self.settings["turn_max_deg"])
-        delta = self.rng.get(RNG_TURN).uniform(-span, span)
-        f["heading_deg"] = (f["heading_deg"] + delta) % 360
-
     def _swim(self, f):
-        v = self._speed(f["kind"])
-        if v == 0.0:
-            return
-        step = v / float(self.settings["tick_hz"])
+        step = float(self.t["fish_speed"]) / TICK
         rad = math.radians(f["heading_deg"])
-        f["pos"][0] += step * math.cos(rad)
-        f["pos"][1] += step * math.sin(rad)
-        self._reflect(f)
+        direction = [math.cos(rad), math.sin(rad)]
+        limits = (self.t["fish_x"], self.t["fish_depths"][f["kind"]])
+        flipped = False
+        for axis, (lo, hi) in enumerate(limits):
+            value = f["pos"][axis] + direction[axis] * step
+            # phản xạ phần quãng đường vượt mép; đúng mép cũng đảo thành phần hướng
+            while (value >= hi and direction[axis] > 0) or (value <= lo and direction[axis] < 0):
+                edge = hi if direction[axis] > 0 else lo
+                value = 2 * edge - value
+                direction[axis] = -direction[axis]
+                flipped = True
+            f["pos"][axis] = value
+        if flipped:
+            f["heading_deg"] = math.degrees(math.atan2(direction[1], direction[0])) % 360
 
-    def _reflect(self, f):
-        """Chạm mép thì kẹp lại trong vùng và phản xạ hướng như gương."""
-        (xlo, xhi), (dlo, dhi) = self._area()
-        h = f["heading_deg"]
-        x, d = f["pos"]
-        if x < xlo or x > xhi:
-            # TODO(ticket): kẹp về mép hay gập phần vượt quá vào trong (như patrol của quái)?
-            f["pos"][0] = min(max(x, xlo), xhi)
-            h = 180.0 - h          # đảo thành phần x
-        if d < dlo or d > dhi:
-            f["pos"][1] = min(max(d, dlo), dhi)
-            h = -h                 # đảo thành phần d
-        f["heading_deg"] = h % 360
+    def _open_points(self):
+        """Điểm sinh theo loài, cách mọi đàn đang sống hơn fish_spawn_clearance."""
+        clearance = self.t["fish_spawn_clearance"]
+        result = {}
+        for kind in sorted(self.t["fish_spawn_depths"]):
+            points = [[float(x), float(d)] for x in self.t["fish_spawn_x"]
+                      for d in self.t["fish_spawn_depths"][kind]
+                      if all(math.dist((x, d), f["pos"]) > clearance for f in self.fish)]
+            if points:
+                result[kind] = points
+        return result
 
-    def _spawn(self, phase_tick, events):
-        every = int(self.settings["spawn_interval_ticks"])
-        if every <= 0 or phase_tick == 0 or phase_tick % every != 0:
-            return
-        if len(self.fish) >= int(self.settings["cap"]):
-            return
+    def _spawn_one(self):
+        points = self._open_points()
+        if not points:
+            return None
         r = self.rng.get(RNG_SPAWN)
-        (xlo, xhi), (dlo, dhi) = self._area()
-        kinds = self.settings["spawn_kinds"]
-        # TODO(ticket): chọn loài (đều? có trọng số?), vị trí và hướng xuất hiện; thứ tự rút số.
-        kind = kinds[r.randrange(len(kinds))]
-        pos = [r.uniform(xlo, xhi), r.uniform(dlo, dhi)]
-        heading = r.choice((0.0, 180.0))
-        f = {"id": self.ids.new("F"), "kind": kind, "pos": pos, "heading_deg": heading}
+        kinds = list(points)
+        weights = [self.t["fish_weights"][k] for k in kinds]
+        roll = r.random() * sum(weights)
+        kind = kinds[-1]
+        for k, weight in zip(kinds, weights):
+            if roll < weight:
+                kind = k
+                break
+            roll -= weight
+        pos = r.choice(points[kind])
+        f = {"id": self.ids.new("F"), "kind": kind, "pos": pos,
+             "heading_deg": r.uniform(0.0, 360.0), "age_ticks": 0}
         self.fish.append(f)
-        # TODO(ticket): data của fish_spawned theo mục E của TICKET-02.
-        events.append(("fish_spawned", {"fish_id": f["id"], "kind": kind, "pos": list(pos)}))
+        return f

@@ -97,19 +97,16 @@ def _validate_gather(g):
             raise BadInput(f"tuning.gather.nodes.{n['id']}: nút hái nằm ở mặt nước (d = 0)")
     if kinds != set(NODE_KINDS):
         raise BadInput(f"tuning.gather.nodes phải có ít nhất một nút mỗi loại {NODE_KINDS}")
-    fish = g.get("fish_initial")
-    if not isinstance(fish, list) or len(fish) != 8:
-        raise BadInput("tuning.gather.fish_initial phải là danh sách đúng 8 đàn (v1.1)")
-    seen = set()
-    for f in fish:
-        if not isinstance(f, dict) or not isinstance(f.get("id"), str) or f["id"] in seen:
-            raise BadInput("tuning.gather.fish_initial: mỗi đàn cần id duy nhất")
-        seen.add(f["id"])
-        if f.get("kind") not in fy:
-            raise BadInput(f"tuning.gather.fish_initial.{f['id']}: kind phải thuộc fish_yield")
-        _pos_in(f"gather.fish_initial.{f['id']}.pos", f.get("pos"), b, ("x", "d"))
-        if f["pos"][1] <= g["surface_depth"]:
-            raise BadInput(f"tuning.gather.fish_initial.{f['id']}: đàn cá phải ở dưới nước")
+    # v1.1: fish_initial là SỐ đàn đầu ca; vị trí lấy từ các điểm sinh theo seed
+    if g.get("fish_initial") != 8 or isinstance(g.get("fish_initial"), bool):
+        raise BadInput("tuning.gather.fish_initial phải là số 8 (v1.1)")
+    for key in ("fish_speed", "fish_turn_ticks", "fish_max", "fish_spawn_ticks", "fish_spawn_clearance",
+                "fish_x", "fish_depths", "fish_spawn_x", "fish_spawn_depths", "fish_weights", "monsters"):
+        if key not in g:
+            raise BadInput(f"tuning.gather thiếu {key} (v1.1)")
+    for key in ("fish_depths", "fish_spawn_depths", "fish_weights"):
+        if not isinstance(g[key], dict) or set(g[key]) != set(FISH_KINDS):
+            raise BadInput(f"tuning.gather.{key} phải có đúng {FISH_KINDS}")
 
 
 def validate_tuning(t):

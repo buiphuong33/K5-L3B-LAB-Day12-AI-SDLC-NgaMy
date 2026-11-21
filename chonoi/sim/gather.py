@@ -24,6 +24,8 @@ import math
 
 from ..ids import sort_by_id
 from ..inventory import hold_to_items
+from .fish import FishSchool
+from .monsters import MonsterSet
 from .ramp import ramp_velocity
 
 TICK = 60.0
@@ -57,18 +59,15 @@ class GatherSim:
         src_nodes = scenario["nodes"] if "nodes" in scenario else t["nodes"]
         self.nodes = [{"id": n["id"], "kind": n["kind"], "pos": [float(c) for c in n["pos"]],
                        "regrow_ticks": n.get("regrow_ticks", 0)} for n in src_nodes]
-        if "fish" in scenario:
-            src_fish = scenario["fish"]
-        elif scenario.get("random_fish", True):
-            src_fish = t["fish_initial"]
-        else:
-            src_fish = []
-        # Đàn cá đứng yên ở phase này. Cá bơi / sinh thêm là việc của phase sau.
-        self.fish = [{"id": f["id"], "kind": f["kind"], "pos": [float(c) for c in f["pos"]],
-                      "heading_deg": f.get("heading_deg", 0)} for f in src_fish]
-        for coll in (self.nodes, self.fish):
-            for e in coll:
-                ids.reserve(e["id"])
+        for n in self.nodes:
+            ids.reserve(n["id"])
+        # random_fish=false: chỉ có cá fixture và đứng yên; bật thì `fish` thay đàn đầu ca, vẫn bơi/sinh
+        moving = scenario.get("random_fish", True)
+        src_fish = scenario.get("fish", None if moving else [])
+        self.school = FishSchool(t, streams, ids, fish=src_fish, moving=moving)
+        self.monster_set = MonsterSet(t["monsters"], t["bounds"], monsters=scenario.get("monsters"),
+                                      day=t.get("current_day", 1))
+        self._phase_tick = 0
         self.money = 0
         self.earned = 0
         self.reputation = tuning["quan"]["reputation_initial"]
@@ -91,13 +90,14 @@ class GatherSim:
             "nodes": [{"id": n["id"], "pos": n["pos"], "kind": n["kind"],
                        "ready": n["regrow_ticks"] == 0, "regrow_ticks": n["regrow_ticks"]}
                       for n in sort_by_id(self.nodes)],
-            "fish": [{"id": f["id"], "pos": f["pos"], "kind": f["kind"], "heading_deg": f["heading_deg"]}
-                     for f in sort_by_id(self.fish)],
+            "fish": self.school.snapshot(),
+            "monsters": self.monster_set.snapshot(),
         }
 
     # --- một bước ---------------------------------------------------------------
     def step(self, inp):
         events = []
+        self._phase_tick += 1
         # 1. đồng hồ và hàng có sẵn: giảm bộ đếm, nút mọc lại
         self.time_left_ticks = max(0, self.time_left_ticks - 1)
         self.invuln_ticks = max(0, self.invuln_ticks - 1)
@@ -118,6 +118,11 @@ class GatherSim:
         # 2b. oxy theo d CUỐI bước, ngạt, Máu, ngất
         if self._update_oxygen(now_surface, events):
             return events
+        # 2c. thủy quái theo id, tối đa một hit
+        self.monster_set.step(self, events)
+        if self.hp <= 0:
+            self._faint(events, cause="monster")
+            return events
         # 3. interact: bến trước, rồi hái
         if inp.pressed("interact"):
             if self._in_dock():
@@ -131,6 +136,9 @@ class GatherSim:
         # 5. hết giờ
         if self.time_left_ticks <= 0:
             self._finish("time", events)
+            return events
+        # 6. còn giờ: cá bơi rồi sinh thêm (bắt cá ở trên dùng vị trí trước khi bơi)
+        self.school.step(self._phase_tick, events)
         return events
 
     # --- lát 1: oxy, ngạt, Máu, giỏ ---------------------------------------------
@@ -158,11 +166,11 @@ class GatherSim:
         self._faint(events)
         return True
 
-    def _faint(self, events):
+    def _faint(self, events, cause="choke"):
         """Máu về 0: mất toàn bộ giỏ, kết thúc buổi với kho rỗng."""
         lost = list(reversed(self.hold))  # thứ tự bỏ: nhặt sau bỏ trước
         self.hold = []
-        events.append(("faint", {"cause": "choke", "lost": lost, "hp": 0}))
+        events.append(("faint", {"cause": cause, "lost": lost, "hp": 0}))
         self._finish("fainted", events)
 
     # --- lát 2: hái, bắt cá -----------------------------------------------------
@@ -189,7 +197,7 @@ class GatherSim:
         events.append(("gather", {"node_id": node["id"], "kind": node["kind"], "amount": amount}))
 
     def _catch(self, events):
-        fish = self._nearest(self.fish, self.t["catch_radius"])
+        fish = self._nearest(self.school.fish, self.t["catch_radius"])
         if fish is None:
             return
         amount = int(self.t["fish_yield"][fish["kind"]])
@@ -199,7 +207,7 @@ class GatherSim:
                                          "required": amount, "free": free}))
             return
         self.hold.extend([fish["kind"]] * amount)
-        self.fish.remove(fish)
+        self.school.remove(fish)
         self.catch_cd_ticks = int(round(self.t["catch_cooldown_s"] * TICK))
         events.append(("fish_caught", {"fish_id": fish["id"], "kind": fish["kind"], "yield": amount}))
 
