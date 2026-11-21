@@ -65,7 +65,40 @@ Tài liệu giữ nguyên chủ cũ: Tâm ghi `docs/clarify.md`, Nga ghi `docs/s
 - **`scenario.py` (Nga):** Tâm và Huyền gửi Nga quy tắc kiểm cho `fish[]`, `monsters[]`, Phương gửi quy tắc cho khối `day`.
 - **Test cũ cần đổi vì số chuẩn:** báo Huyền sửa và ghi lý do trong commit.
 
-## Phase 3–4
+## Phân công Phase 3 (TICKET-03, Test Contract v1.2, hạn tag 2:30)
+
+Phạm vi: chỉ làm **lõi độ tươi**. Nhóm 4 người không bắt buộc làm Dòng nước lũ và Khách đặt trước. Mỗi file vẫn chỉ có một người sửa.
+
+| Người | Lát | Việc phải giao | File sở hữu trong Phase 3 | Test của lát |
+|---|---|---|---|---|
+| **Phương** | 1. Schema và bàn giao | Khối `freshness`, `contract_version: "1.2"`; đọc/ghi kho cá thể, kho đếm trả mã 2; bàn giao trong `day`, id tăng xuyên pha và Ngày; HUD độ tươi; `CHANGELOG.md` | `chonoi/items.py` (mới), `chonoi/inventory.py`, `game.contract.json`, `chonoi/contract.py`, `chonoi/sim/day.py`, `chonoi/runner.py`, `chonoi/web/`, `CHANGELOG.md` | `tests/test_p3_inventory.py` |
+| **Tâm** | 2. Độ tươi buổi sáng | Giỏ chứa cá thể, cấp id khi hái/bắt, hao 0.5/s từ bước sau, `spoiled` location `hold`; `lost` là mảng cá thể LIFO; `gather_end.inventory` schema mới | `chonoi/sim/gather.py`, `chonoi/sim/fish.py` | `tests/test_p3_gather.py` |
+| **Nga** | 3. Độ tươi ở quán | Kho cá thể, hao 0.25/s, `spoiled` location `stock`; giữ chỗ theo id, nhả và giữ lại một lần, `unfulfillable`; giá theo độ tươi; `cook_started.items`; kiểm scenario v1.2 | `chonoi/sim/quan.py`, `chonoi/scenario.py` | `tests/test_p3_quan.py` |
+| **Huyền** | 4. Migration và kiểm chứng | Đổi fixture P1–P2 sang schema mới và ghi lý do; kiểm `lost` của quái; smoke ngưỡng 30, smoke file và `day`; regression; ma trận AC-P3 | `chonoi/sim/monsters.py`, `tests/` còn lại, `docs/verification/phase-3.md`, `docs/proof/phase-3/` | `tests/test_p3_smoke.py` |
+
+Tài liệu giữ nguyên chủ cũ: Tâm ghi `docs/clarify.md`, Nga ghi `docs/standup.md`, `docs/retro.md`, `docs/ai-usage-log.md`.
+
+### Thứ tự tích hợp để `main` luôn chạy được
+
+| Mốc | Việc | Người |
+|---|---|---|
+| 1:55–2:02 | Cả nhóm `git pull`, đọc ticket, chốt giao diện bên dưới và ghi quyết định đổi schema vào `docs/adr/` | Cả nhóm, Phương ghi |
+| Trước 2:05 | Đẩy `chonoi/items.py`. Contract **vẫn giữ 1.1** để `main` không đỏ | Phương |
+| 2:05–2:15 | Tâm, Nga làm trên nhánh riêng; Huyền chuẩn bị fixture v1.2 | Tâm, Nga, Huyền |
+| 2:15 | Smoke bàn giao kho trên bản tích hợp, standup, điều người sang lát trễ | Huyền, Nga ghi |
+| 2:15–2:22 | Gộp `gather`, `quan`, fixture trong **một lần** rồi bật `contract_version: "1.2"` | Phương |
+| 2:22–2:27 | Smoke hai tiến trình và `day`, regression, chốt CHANGELOG và bằng chứng | Huyền, Phương |
+| Trước 2:30 | Gắn và đẩy tag `phase-3` | Phương |
+
+### Giao diện chốt giữa các lát
+
+- **`chonoi/items.py` (Phương):** lưu độ tươi bằng số nguyên, 240 đơn vị mỗi điểm. Gather trừ 2 đơn vị/tick, quán trừ 1 đơn vị/tick, ươn khi dưới 7200. Có hàm tạo cá thể, đọc/xuất `{id, kind, fresh}`, hao tươi và trả danh sách vừa ươn theo id.
+- **Id cá thể:** dùng chung `IdAllocator` với tiền tố `I`, nên id tăng liên tục xuyên pha và Ngày.
+- **`gather` → `day` → `quan`:** truyền nguyên danh sách cá thể trong cùng tick, không hao thêm.
+- **`monsters.py` (Huyền):** tiếp tục `pop` từ `player.hold`, nên `lost` tự là mảng cá thể theo LIFO.
+- **`scenario.py` (Nga):** Phương gửi hàm kiểm cá thể từ `items.py`, Nga dùng cho `gather.hold`, `quan.stock`, `customers[].reserved`.
+
+## Phase 4
 
 Yêu cầu mở theo mốc giờ trên lab board. Khi phase mở, Tâm đọc yêu cầu, Phương chia việc trong 5 phút theo nguyên tắc: tính năng thuộc module nào thì chủ module đó làm, tính năng mới đặt ở **file mới có đúng một chủ** và ghi thêm vào bảng trên.
 
