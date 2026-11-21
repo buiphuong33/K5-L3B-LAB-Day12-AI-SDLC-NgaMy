@@ -13,9 +13,21 @@ class QuanSim:
     mode = "quan"
     phase = "quan"
 
-    def __init__(self, tuning, scenario, streams, ids, inventory=None):
+    def __init__(self, tuning, scenario, streams, ids, inventory=None, dishes=None):
         self.t = tuning["quan"]
-        self.menu = tuning["menu"]
+        full_menu = tuning["menu"]
+        if dishes is None:
+            menu_ids = set(full_menu)
+        elif isinstance(dishes, dict):
+            menu_ids = set(dishes)
+        elif isinstance(dishes, (list, tuple, set)):
+            menu_ids = set(dishes)
+        else:
+            raise BadInput("dishes phải là danh sách hoặc map món trong kế hoạch ngày")
+        unknown = menu_ids - set(full_menu)
+        if unknown:
+            raise BadInput(f"món ngoài menu kế hoạch ngày: {sorted(unknown)}")
+        self.menu = {dish_id: full_menu[dish_id] for dish_id in sorted(menu_ids)}
         self.rng = streams
         self.ids = ids
         player = scenario.get("player", {})
@@ -47,6 +59,9 @@ class QuanSim:
             customer.setdefault("eat_ticks_left", 0)
             customer.setdefault("base_price", None)
             customer.setdefault("tip", None)
+            if (customer.get("order_status") in {"reserved", "assigned", "served"} and
+                    customer.get("dish_id") not in self.menu):
+                raise BadInput(f"khách {customer.get('id')}: món không có trong thực đơn ngày")
             if customer["order_status"] == "reserved" and "reserved" not in customer:
                 missing_reservations.append(customer)
                 customer["reserved"] = {}
